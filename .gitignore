@@ -14,6 +14,8 @@ target/
 !.mvn/wrapper/maven-wrapper.jar
 *.log
 upload/
+# 运行期日志目录（logback-spring.xml 的 FILE appender 输出到这里）
+logs/
 
 # ===== Python（tools/ 下的验证脚本）=====
 __pycache__/
@@ -37,3 +39,9 @@ Thumbs.db
 # ===== 工具状态 =====
 .workbuddy/
 nul
+# 校验脚本的临时目录（如 check_app_sfc.cjs 的语法检查中转文件）
+tools/.tmp/
+# 一键回归每次运行都会重写这些产物（可随时重跑生成），不入库；
+# 结论数据以 docs/测试报告.md 为准，与 tools/baseline_*/ 的日志归档惯例一致。
+tools/out/regression_*.md
+tools/out/*.log

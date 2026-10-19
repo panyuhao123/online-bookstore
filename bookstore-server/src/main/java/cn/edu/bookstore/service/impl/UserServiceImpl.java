@@ -2,6 +2,7 @@ package cn.edu.bookstore.service.impl;
 
 import cn.edu.bookstore.common.BusinessException;
 import cn.edu.bookstore.common.ErrorCode;
+import cn.edu.bookstore.common.observability.BusinessMetrics;
 import cn.edu.bookstore.common.security.LoginAttemptGuard;
 import cn.edu.bookstore.common.security.TokenRevocationService;
 import cn.edu.bookstore.common.util.JwtUtil;
@@ -54,6 +55,7 @@ public class UserServiceImpl implements UserService {
     private final CaptchaService captchaService;
     private final LoginAttemptGuard loginAttemptGuard;
     private final TokenRevocationService tokenRevocationService;
+    private final BusinessMetrics businessMetrics;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -85,7 +87,14 @@ public class UserServiceImpl implements UserService {
 
         // 2. 锁定检查：放在验证码之后、查库之前。先过验证码，是为了避免「未过验证码就能探测账号是否被锁」；
         //    放在查库之前，是为了让锁定期间的请求连数据库都不碰。
-        loginAttemptGuard.checkNotLocked(SCOPE_USER, request.getPhone());
+        try {
+            loginAttemptGuard.checkNotLocked(SCOPE_USER, request.getPhone());
+        } catch (BusinessException e) {
+            // 被锁定而拒绝：单独记一类结果。监控上把「口令错误」与「账号已被锁」分开，
+            // 才能一眼看出「是否正在被人爆破」——失败数飙升但锁定数为 0 说明阈值还没生效。
+            businessMetrics.loginAttempt(SCOPE_USER, BusinessMetrics.RESULT_LOCKED);
+            throw e;
+        }
 
         // 3. 账号密码校验
         User user = userMapper.selectOne(new LambdaQueryWrapper<User>()
@@ -95,11 +104,14 @@ public class UserServiceImpl implements UserService {
         // 不存在的账号同样计入失败次数，否则「不存在的账号永不锁定」本身就是枚举信号。
         if (user == null || !PasswordUtil.matches(request.getPassword(), user.getSalt(), user.getPassword())) {
             loginAttemptGuard.recordFailure(SCOPE_USER, request.getPhone());
+            businessMetrics.loginAttempt(SCOPE_USER, BusinessMetrics.RESULT_FAILURE);
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "手机号或密码错误");
         }
 
         // 密码正确即清零失败计数：避免「上周忘了密码试错 3 次 + 今天手滑 2 次」被算成连续失败
         loginAttemptGuard.reset(SCOPE_USER, request.getPhone());
+        // 口令校验通过即视为一次成功登录（后续的「账号被禁用」属于授权结果，不是认证失败）
+        businessMetrics.loginAttempt(SCOPE_USER, BusinessMetrics.RESULT_SUCCESS);
 
         if (Integer.valueOf(0).equals(user.getStatus())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "账号已被禁用，请联系管理员");

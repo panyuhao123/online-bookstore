@@ -97,6 +97,26 @@ public class SecurityConfig {
             "/swagger-resources/**"
     };
 
+    /**
+     * 运维端点（actuator）中允许匿名访问的路径。
+     *
+     * <p>只有这两个端点对外开放，理由是它们本身不含敏感信息，且需要被外部系统主动拉取：
+     * <ul>
+     *     <li>{@code /actuator/health}：负载均衡器、容器编排（K8s liveness/readiness）靠它判断实例是否需要摘除，
+     *         不可能先登录再探测；</li>
+     *     <li>{@code /actuator/info}：构建版本与关键开关，属于「部署自证」信息，不涉及业务数据。</li>
+     * </ul>
+     *
+     * <p>其余端点（{@code /metrics}、{@code /env}、{@code /beans}、{@code /heapdump} …）一律要求管理员角色：
+     * {@code /env} 与 {@code /heapdump} 一旦公开等于把配置与内存内容交出去，属于严重的信息泄露。
+     * 注意这里只放行 health 与 info，<b>不要</b>图省事写成 {@code /actuator/**}。
+     */
+    private static final String[] ACTUATOR_PUBLIC_PATHS = {
+            "/actuator/health",
+            "/actuator/health/**",
+            "/actuator/info"
+    };
+
     private final AppProperties appProperties;
 
     @Bean
@@ -116,7 +136,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(registry -> {
                     // 跨域预检请求不含令牌，必须放行
                     registry.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                            .requestMatchers(PUBLIC_PATHS).permitAll();
+                            .requestMatchers(PUBLIC_PATHS).permitAll()
+                            // 运维端点：仅 health 与 info 匿名可访问（供探测与部署自证）
+                            .requestMatchers(ACTUATOR_PUBLIC_PATHS).permitAll();
                     // 接口文档：按 bookstore.docs.enabled 决定放行还是拒绝。
                     // 关闭时用 denyAll（而不是「不写规则」），让意图明确、日志里也能看出来。
                     if (appProperties.getDocs().isEnabled()) {
@@ -127,6 +149,9 @@ public class SecurityConfig {
                     registry
                             // 后台接口：必须是管理员角色（APP 用户令牌访问返回 403）
                             .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                            // 运维端点：health / info 已在上面放行，其余（metrics/env/beans…）只给管理员。
+                            // 用 hasRole 而不是放行，是因为指标与运行时信息能反推出系统内部结构。
+                            .requestMatchers("/actuator/**").hasRole("ADMIN")
                             // 其余接口（购物车、地址、订单等）必须登录
                             .anyRequest().authenticated();
                 })

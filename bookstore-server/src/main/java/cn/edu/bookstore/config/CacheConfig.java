@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import cn.edu.bookstore.common.cache.CacheCircuitBreaker;
 import cn.edu.bookstore.common.cache.ResilientCacheManager;
+import cn.edu.bookstore.common.cache.TransactionAwareCacheManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -96,7 +97,21 @@ public class CacheConfig implements CachingConfigurer {
                 appProperties.getCache().getKeyPrefix(), appProperties.getCache().getTtlMinutes(),
                 CART_TTL_MINUTES);
         // 再包一层熔断：Redis 不可用时直接跳过缓存，避免每个请求都等一轮超时
-        return new ResilientCacheManager(redisCacheManager, cacheCircuitBreaker);
+        CacheManager resilient = new ResilientCacheManager(redisCacheManager, cacheCircuitBreaker);
+
+        // 最外层包「事务感知」：带 @Transactional 的写操作，缓存清理推迟到事务提交之后执行。
+        //
+        // 顺序是有意的 —— 外层负责「什么时候清」，内层负责「能不能清」：
+        // 提交后真正落到 Redis 时才走熔断判断，判断依据是那一刻的 Redis 状态，而不是事务开始时的状态。
+        //
+        // 不开启时直接返回内层，退回「方法返回即清理」的旧行为（用于对照实验 / 应急回退）。
+        if (!appProperties.getCache().isEvictAfterCommit()) {
+            log.warn("缓存清理时机 = 事务提交前（bookstore.cache.evict-after-commit=false）。"
+                    + "该形态仅用于对照实验：事务未提交便清空缓存，存在并发回填旧值的窗口");
+            return resilient;
+        }
+        log.info("缓存清理时机 = 事务提交后（事务回滚则不清理）");
+        return new TransactionAwareCacheManager(resilient);
     }
 
     /** 通用缓存配置（键用字符串、值用 JSON，便于直接用 redis-cli 排查） */

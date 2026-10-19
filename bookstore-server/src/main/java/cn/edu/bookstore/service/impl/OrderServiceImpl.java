@@ -3,6 +3,7 @@ package cn.edu.bookstore.service.impl;
 import cn.edu.bookstore.common.BusinessException;
 import cn.edu.bookstore.common.ErrorCode;
 import cn.edu.bookstore.common.OrderStatus;
+import cn.edu.bookstore.common.observability.BusinessMetrics;
 import cn.edu.bookstore.entity.Address;
 import cn.edu.bookstore.entity.Book;
 import cn.edu.bookstore.entity.Cart;
@@ -87,6 +88,9 @@ public class OrderServiceImpl implements OrderService {
      * 直接注入会导致启动失败。ObjectProvider 允许「有就用、没有就算了」。
      */
     private final ObjectProvider<CacheManager> cacheManagerProvider;
+
+    /** 业务埋点：下单量与支付量是运营最关心的两个指标 */
+    private final BusinessMetrics businessMetrics;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -181,6 +185,9 @@ public class OrderServiceImpl implements OrderService {
 
         log.info("下单成功 userId={} orderNo={} 金额={} 明细数={}",
                 userId, orders.getOrderNo(), totalAmount, orderItems.size());
+        // 埋点放在最后一步：走到这里订单、明细、库存、购物车都已处理完毕，
+        // 计数才与「真正成功的订单」对得上（中途库存不足等异常会抛在上面，不会计数）。
+        businessMetrics.orderCreated();
 
         OrderVO vo = OrderVO.from(orders);
         vo.setItems(orderItems.stream().map(OrderItemVO::from).toList());
@@ -204,6 +211,7 @@ public class OrderServiceImpl implements OrderService {
         orders.setPayTime(LocalDateTime.now());
         ordersMapper.updateById(orders);
         log.info("模拟支付成功 userId={} orderNo={}", userId, orders.getOrderNo());
+        businessMetrics.orderPaid();
     }
 
     @Override
@@ -221,6 +229,9 @@ public class OrderServiceImpl implements OrderService {
                 .eq(Orders::getStatus, OrderStatus.PENDING_PAY.getCode()));
         if (rows > 0) {
             log.info("支付回调入账成功 orderNo={}", orderNo);
+            // 只在状态确实发生推进（rows>0）时计数：重复推送的通知不会让支付量虚高，
+            // 这也正是「幂等」在监控上的体现。
+            businessMetrics.orderPaid();
             return true;
         }
         log.info("支付回调未产生状态变更（订单已处理或不存在）orderNo={}", orderNo);

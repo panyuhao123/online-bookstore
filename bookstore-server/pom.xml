@@ -47,6 +47,18 @@
             <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
 
+        <!--
+          运维观测（可观测性三件套之一：指标 + 健康检查 + 运行信息）。
+          引入前 application.yml / application-prod.yml 里已有 management.* 配置，
+          但没有这个依赖，那些配置属于「死配置」（写了也不生效）。
+          端点：/actuator/health（存活探测）、/actuator/info（运行信息）、/actuator/metrics（指标）。
+          同时带来 http.server.requests 指标（每个接口的调用次数/耗时），无需写代码即可观测接口性能。
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
         <!-- 安全框架：路径级授权（/api/admin/** 需 ROLE_ADMIN）+ 方法级授权 @PreAuthorize -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -71,6 +83,24 @@
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>
+        </dependency>
+
+        <!--
+          数据库迁移：把建表/改表脚本纳入版本管理，服务启动时自动补齐缺失的迁移。
+          引入前，建库要靠人工按顺序执行 db/schema.sql + 若干 migration_v*.sql，
+          换台机器极易漏执行或执行错顺序（表现为「接口 500：Unknown column」）。
+
+          flyway-mysql 必须显式引入：Flyway 8.2 起把各数据库支持拆成独立模块，
+          只加 flyway-core 会因找不到 MySQL 方言而启动报错。
+          版本由 spring-boot-starter-parent 统一管理（9.22.3），不要手写版本号。
+        -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-mysql</artifactId>
         </dependency>
 
         <!-- JWT 令牌（APP 登录鉴权） -->
@@ -152,6 +182,15 @@
                         </exclude>
                     </excludes>
                 </configuration>
+                <executions>
+                    <execution>
+                        <id>build-info</id>
+                        <goals>
+                            <!-- 生成 META-INF/build-info.properties，供 /actuator/info 展示版本与构建时间 -->
+                            <goal>build-info</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

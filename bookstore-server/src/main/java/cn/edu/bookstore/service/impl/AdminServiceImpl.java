@@ -2,6 +2,7 @@ package cn.edu.bookstore.service.impl;
 
 import cn.edu.bookstore.common.BusinessException;
 import cn.edu.bookstore.common.ErrorCode;
+import cn.edu.bookstore.common.observability.BusinessMetrics;
 import cn.edu.bookstore.common.security.LoginAttemptGuard;
 import cn.edu.bookstore.common.security.TokenRevocationService;
 import cn.edu.bookstore.common.util.JwtUtil;
@@ -51,22 +52,30 @@ public class AdminServiceImpl implements AdminService {
     private final AppProperties appProperties;
     private final LoginAttemptGuard loginAttemptGuard;
     private final TokenRevocationService tokenRevocationService;
+    private final BusinessMetrics businessMetrics;
 
     @Override
     public AdminLoginVO login(AdminLoginRequest request) {
         // 1. 锁定检查：管理端没有验证码，被锁时直接拒绝，连数据库都不查
-        loginAttemptGuard.checkNotLocked(SCOPE_ADMIN, request.getUsername());
+        try {
+            loginAttemptGuard.checkNotLocked(SCOPE_ADMIN, request.getUsername());
+        } catch (BusinessException e) {
+            businessMetrics.loginAttempt(SCOPE_ADMIN, BusinessMetrics.RESULT_LOCKED);
+            throw e;
+        }
 
         Admin admin = adminMapper.selectOne(new LambdaQueryWrapper<Admin>()
                 .eq(Admin::getUsername, request.getUsername()));
 
         if (admin == null || !PasswordUtil.matches(request.getPassword(), admin.getSalt(), admin.getPassword())) {
             loginAttemptGuard.recordFailure(SCOPE_ADMIN, request.getUsername());
+            businessMetrics.loginAttempt(SCOPE_ADMIN, BusinessMetrics.RESULT_FAILURE);
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "账号或密码错误");
         }
 
         // 口令正确即清零失败计数，避免若干天前的零星输错累积成「连续失败」被误锁
         loginAttemptGuard.reset(SCOPE_ADMIN, request.getUsername());
+        businessMetrics.loginAttempt(SCOPE_ADMIN, BusinessMetrics.RESULT_SUCCESS);
 
         if (Integer.valueOf(0).equals(admin.getStatus())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "账号已被禁用，请联系超级管理员");

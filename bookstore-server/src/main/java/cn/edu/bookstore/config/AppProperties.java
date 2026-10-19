@@ -75,6 +75,31 @@ public class AppProperties {
     /** 登录失败锁定（防在线暴力破解） */
     private LoginGuard loginGuard = new LoginGuard();
 
+    /** 可观测性（业务埋点） */
+    private Observability observability = new Observability();
+
+    /**
+     * 可观测性配置。
+     *
+     * <p>系统能「被观测」是运维的基本前提：出问题时如果只有日志、没有指标，
+     * 就只能靠人肉翻日志猜。这里把关键业务事件（登录成败、账号锁定、令牌吊销、
+     * 下单、支付入账）注册成 Micrometer 计数器，通过 {@code /actuator/metrics} 查询。
+     *
+     * <p>为什么做成开关而不是一直开着：埋点本身极轻（内存里维护计数器），
+     * 但保留开关有两个用处 —— 一是可以做「开启/关闭埋点」的耗时对比实验，
+     * 二是万一某个计数器名与未来引入的监控系统冲突，能一键关掉而不必改代码。
+     */
+    @Data
+    public static class Observability {
+
+        /**
+         * 是否启用业务埋点。
+         *
+         * <p>true-注册并递增业务计数器（默认）；false-所有埋点方法变为空操作。
+         */
+        private boolean metricsEnabled = true;
+    }
+
     /**
      * 登录失败锁定配置。
      *
@@ -248,6 +273,18 @@ public class AppProperties {
 
         /** 缓存键统一前缀，便于按业务清理 */
         private String keyPrefix = "bookstore:";
+
+        /**
+         * 缓存清理是否推迟到「事务提交之后」执行。
+         *
+         * <p>开启（默认）：带 {@code @Transactional} 的写操作在事务提交成功后才清理缓存，
+         * 消除「事务尚未提交就把缓存清空、并发请求趁机把旧值回填」的不一致窗口。
+         * 事务回滚时不再做无意义的清理（数据没变，缓存本来就与数据库一致）。
+         *
+         * <p>关闭：回到「方法返回即清理」的旧行为。保留这个开关有两个用途 ——
+         * 一是做「提交前清理 vs 提交后清理」的影响对照实验，二是万一新行为引发问题可一键回退。
+         */
+        private boolean evictAfterCommit = true;
     }
 
     /**
@@ -453,11 +490,13 @@ public class AppProperties {
 
         log.info("配置加载完成：jwtExpireHours={}, tokenRevocationEnabled={}, uploadBaseDir={}, storageType={}, "
                         + "allowedOrigins={}, orderTimeoutMinutes={}, autoCancelEnabled={}, payType={}, "
-                        + "gaodeEnabled={}, docsEnabled={}, loginGuardEnabled={}, maxFailures={}, lockMinutes={}",
+                        + "gaodeEnabled={}, docsEnabled={}, loginGuardEnabled={}, maxFailures={}, lockMinutes={}, "
+                        + "metricsEnabled={}",
                 jwt.getExpireHours(), jwt.getRevocation().isEnabled(), upload.getBaseDir(), storage.getType(),
                 cors.getAllowedOrigins(), order.getTimeoutMinutes(), order.isAutoCancelEnabled(), pay.getType(),
                 gaodeEnabled, docs.isEnabled(), loginGuard.isEnabled(),
-                loginGuard.getMaxFailures(), loginGuard.getLockMinutes());
+                loginGuard.getMaxFailures(), loginGuard.getLockMinutes(),
+                observability.isMetricsEnabled());
     }
 
     /**

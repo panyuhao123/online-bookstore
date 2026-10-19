@@ -51,6 +51,10 @@ bookstore:
     # 阈值沿用默认的「5 次失败锁 15 分钟」——管理端没有验证码，这层是它唯一的在线防护；
     # 若线上确实遭遇持续爆破，可调紧 max-failures，或用环境变量临时覆盖。
     enabled: true
+  observability:
+    # 业务埋点保留开启：生产正是最需要看指标的地方（登录失败率、下单量、支付量）。
+    # 埋点只在内存中维护计数器，开销可忽略；若不希望有任何额外开销可设为 false。
+    metrics-enabled: true
 
 springdoc:
   api-docs:
@@ -61,12 +65,13 @@ springdoc:
 knife4j:
   enable: false
 
-# ---------------- 监控端点收敛 ----------------
+# ---------------- 运维端点收敛 ----------------
 management:
   endpoints:
     web:
       exposure:
-        # 只暴露 health，其余端点（env/beans/heapdump 等）一律不开
+        # 只暴露 health，其余端点（info/metrics/env/beans/heapdump 等）一律不开。
+        # 生产环境连 info/metrics 都不暴露，是因为它们能反推出内部结构与业务量级。
         include: health
   endpoint:
     health:

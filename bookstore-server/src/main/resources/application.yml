@@ -32,6 +32,30 @@ spring:
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
+  # ---------------- 数据库迁移（Flyway） ----------------
+  # 迁移脚本位于 classpath:db/migration（源码路径 src/main/resources/db/migration），
+  # 服务启动时自动执行缺失的版本 ——「建一个空库 + 启动服务」就等于完成建表，
+  # 不再需要人工按顺序敲 db/schema.sql 与若干 migration_v*.sql（漏跑一个就会 500）。
+  #
+  # ⚠ 不要把 spring.flyway.enabled 设成 false 来「绕开报错」：
+  #   那会让服务带着残缺的表结构跑起来，把启动期的显式错误换成运行期的隐式错误。
+  flyway:
+    locations: classpath:db/migration
+    # 已有库（演示库/生产库）首次接入 Flyway 时的关键开关。
+    # 这些库的表是历史上手工建的，没有 flyway_schema_history 表；
+    # 若不处理，Flyway 会以为库是空的并从 V1 开始执行，
+    # 而 V1 里的 CREATE TABLE 立刻撞上「表已存在」→ 启动失败。
+    # 打开后：非空库被打上基线（记一条 baseline 记录，历史版本视为已应用，只跑更高版本）；
+    #         全新空库不受影响，仍从 V1 正常顺序执行到最新。
+    baseline-on-migrate: true
+    # 基线版本 = 手工脚本时期已经应用到的「结构版本」
+    # （v1 建表 / v2 图书索引 / v3 操作日志表 / v4 评价表 / v5 地址行政区划编码）
+    baseline-version: "5"
+    baseline-description: 接入 Flyway 前的历史结构与数据（对应手工脚本 v1~v5）
+    # 校验已应用迁移的校验和：谁改动了历史脚本，启动即失败，而不是静默放过
+    validate-on-migrate: true
+    # 禁止 flyway clean（会清空整个库）。Flyway 9 起默认已禁用，这里显式声明态度
+    clean-disabled: true
   servlet:
     multipart:
       max-file-size: ${UPLOAD_MAX_FILE_SIZE:5MB}
@@ -119,6 +143,12 @@ bookstore:
     enabled: ${CACHE_ENABLED:true}
     ttl-minutes: ${CACHE_TTL_MINUTES:30}
     key-prefix: "bookstore:"
+    # 缓存清理时机：
+    #   true （默认）—— 带 @Transactional 的写操作，清理推迟到「事务提交成功之后」；
+    #                   ① 消除「事务未提交就清空缓存 → 并发读把旧值回填」的不一致窗口；
+    #                   ② 事务回滚时不清理（数据没变，缓存本来就与库一致）。
+    #   false —— 旧行为（方法返回即清理），仅用于对照实验与应急回退。
+    evict-after-commit: ${CACHE_EVICT_AFTER_COMMIT:true}
   docs:
     # 是否开放接口文档入口（/doc.html）。本地开发默认开放，便于调试与答辩演示；
     # application-prod.yml 中已改为 false —— 生产环境暴露完整接口清单属于信息泄露。
@@ -134,6 +164,11 @@ bookstore:
     window-minutes: ${LOGIN_GUARD_WINDOW_MINUTES:30}
     # 锁定时长：到期自动解锁，无需人工干预
     lock-minutes: ${LOGIN_GUARD_LOCK_MINUTES:15}
+  observability:
+    # 业务埋点开关：开启后关键链路（登录成败/锁定、令牌吊销、下单、支付入账）
+    # 会向 Micrometer 注册计数器，可通过 /actuator/metrics/bookstore.* 查询。
+    # 关闭后埋点方法变为空操作，不影响主流程 —— 便于做「埋点开销」对比实验。
+    metrics-enabled: ${METRICS_ENABLED:true}
   order:
     # 待支付订单超时时长（分钟）：超过该时长仍未支付，由定时任务自动取消并回补库存
     timeout-minutes: ${ORDER_TIMEOUT_MINUTES:30}
@@ -165,13 +200,15 @@ bookstore:
       timeout-minutes: ${ALIPAY_TIMEOUT_MINUTES:30}
 
 # ---------------- 日志 ----------------
+# 输出格式统一由 resources/logback-spring.xml 定义，这里只调级别：
+#   · 非 prod profile → 文本日志（含链路 ID [requestId]），便于本地调试与答辩演示
+#   · prod profile     → JSON 行式日志，便于采集端按字段解析与索引
+# 注意：不要再写 logging.pattern.* —— 一旦定义了 logback-spring.xml，
+# 那里的 encoder 才是最终生效的，application.yml 里写的 pattern 会被静默忽略（死配置）。
 logging:
   level:
     root: INFO
     cn.edu.bookstore: DEBUG
-  pattern:
-    # %X{requestId} 输出链路 ID，与响应头 X-Request-Id 一致
-    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{requestId}] %logger{40} - %msg%n"
 
 # ---------------- 接口文档（Knife4j / OpenAPI 3） ----------------
 springdoc:
@@ -189,12 +226,31 @@ knife4j:
   setting:
     language: zh_cn
 
-# ---------------- 监控端点 ----------------
+# ---------------- 运维观测（actuator） ----------------
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        # 本地开发暴露三个端点：
+        #   health  —— 存活/就绪探测（负载均衡、容器编排用）
+        #   info    —— 运行信息（版本、构建时间、关键开关），答辩时可用来「一眼看清系统当前形态」
+        #   metrics —— 指标（含 http.server.requests，能直接看到每个接口的调用次数与耗时）
+        # 生产环境收敛为只暴露 health（见 application-prod.yml）。
+        include: health,info,metrics
   endpoint:
     health:
+      # 本地展示数据库、Redis 等依赖的明细，依赖异常时一眼可见；
+      # 生产环境改为 never，避免对外暴露内部拓扑。
       show-details: always
+  info:
+    # 让 /actuator/info 输出构建信息（由 build-info 目标生成）、Java 与操作系统版本
+    env:
+      enabled: true
+    java:
+      enabled: true
+    os:
+      enabled: true
+  metrics:
+    tags:
+      # 给所有指标打上应用名标签：将来多个服务共用一套监控时便于区分来源
+      application: ${spring.application.name}

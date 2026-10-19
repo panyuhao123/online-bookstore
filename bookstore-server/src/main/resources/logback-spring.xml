@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  日志配置（Logback）。
+
+  文件名必须以 logback-spring.xml 结尾（而不是 logback.xml），
+  否则 <springProfile> 标签不会被 Spring Boot 解析 —— 这是常见的踩坑点。
+
+  两种输出形态：
+    · 本地/开发（非 prod profile）：人读文本 + 文本文件归档，便于调试与答辩演示；
+    · 生产（prod profile）      ：JSON 行式日志，便于采集端按字段解析与索引。
+  两者都同时输出到控制台与文件；文件按「时间 + 大小」滚动归档。
+-->
+<configuration>
+
+    <!-- 日志文件目录，可用环境变量 LOG_HOME 覆盖 -->
+    <property name="LOG_HOME" value="${LOG_HOME:-logs}"/>
+
+    <!--
+      控制台文本格式：与改造前 application.yml 里的 logging.pattern.console 完全一致，
+      保证本地开发与答辩演示看到的输出没有变化（含链路 ID [requestId]）。
+    -->
+    <property name="TEXT_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{requestId}] %logger{40} - %msg%n"/>
+
+    <!-- ==================== 控制台 ==================== -->
+    <appender name="CONSOLE_TEXT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${TEXT_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <appender name="CONSOLE_JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="cn.edu.bookstore.common.log.JsonLogEncoder">
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- ==================== 文件（文本） ==================== -->
+    <appender name="FILE_TEXT" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_HOME}/bookstore.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!-- 按天 + 达到 20MB 就切分，历史保留 15 天、总量封顶 1GB -->
+            <fileNamePattern>${LOG_HOME}/bookstore.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>20MB</maxFileSize>
+            <maxHistory>15</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${TEXT_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- ==================== 文件（JSON） ==================== -->
+    <appender name="FILE_JSON" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_HOME}/bookstore-json.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_HOME}/bookstore-json.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>20MB</maxFileSize>
+            <maxHistory>15</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder class="cn.edu.bookstore.common.log.JsonLogEncoder">
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!--
+      生产：JSON 形态（控制台与文件都是），日志级别由 application-prod.yml 的
+      logging.level.* 控制（Spring Boot 会在加载本文件后再应用那些配置）。
+    -->
+    <springProfile name="prod">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE_JSON"/>
+            <appender-ref ref="FILE_JSON"/>
+        </root>
+    </springProfile>
+
+    <!--
+      非生产（local / 测试 / 未指定）：人读文本形态。
+      注意这里用 "!prod" 而不是 "local"：没显式指定 profile 时（或有其它 profile 时）也应落到默认形态，
+      避免出现「谁都没匹配上、日志一条都不输出」的情况。
+    -->
+    <springProfile name="!prod">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE_TEXT"/>
+            <appender-ref ref="FILE_TEXT"/>
+        </root>
+    </springProfile>
+
+</configuration>

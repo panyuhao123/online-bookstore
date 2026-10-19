@@ -1,5 +1,6 @@
 package cn.edu.bookstore.common.security;
 
+import cn.edu.bookstore.common.observability.BusinessMetrics;
 import cn.edu.bookstore.common.util.JwtUtil;
 import cn.edu.bookstore.config.AppProperties;
 import com.auth0.jwt.interfaces.DecodedJWT;
@@ -68,6 +69,7 @@ public class TokenRevocationService {
     private final StringRedisTemplate redisTemplate;
     private final AppProperties appProperties;
     private final JwtUtil jwtUtil;
+    private final BusinessMetrics businessMetrics;
 
     /** Redis 可用性标记；置 false 后按 {@link #RETRY_INTERVAL_MS} 周期重试 */
     private volatile boolean redisAvailable = true;
@@ -79,10 +81,12 @@ public class TokenRevocationService {
     /** 降级用的本地吊销表（键 → 过期时刻 epoch millis） */
     private final Map<String, Long> localRevoked = new ConcurrentHashMap<>();
 
-    public TokenRevocationService(StringRedisTemplate redisTemplate, AppProperties appProperties, JwtUtil jwtUtil) {
+    public TokenRevocationService(StringRedisTemplate redisTemplate, AppProperties appProperties, JwtUtil jwtUtil,
+                                  BusinessMetrics businessMetrics) {
         this.redisTemplate = redisTemplate;
         this.appProperties = appProperties;
         this.jwtUtil = jwtUtil;
+        this.businessMetrics = businessMetrics;
     }
 
     /**
@@ -137,6 +141,7 @@ public class TokenRevocationService {
             try {
                 redisTemplate.opsForValue().set(key, value, Duration.ofSeconds(ttlSeconds));
                 log.info("令牌已吊销 jti={} actor={} 剩余有效期={}秒", jti, value, ttlSeconds);
+                businessMetrics.tokenRevoked(roleOf(actor));
                 return;
             } catch (Exception e) {
                 markRedisFailure(e);
@@ -148,6 +153,23 @@ public class TokenRevocationService {
         localRevoked.put(key, System.currentTimeMillis() + ttlSeconds * 1000L);
         log.warn("Redis 不可用，令牌吊销已降级为「仅本实例生效」，其他实例上的该令牌仍有效。"
                 + "actor={} jti={}", value, jti);
+        // 降级路径同样计入：吊销动作确实发生了（只是生效范围缩小到本实例）
+        businessMetrics.tokenRevoked(roleOf(actor));
+    }
+
+    /**
+     * 从吊销主体中取出角色，用于埋点标签。
+     *
+     * <p>{@code actor} 的格式固定为 {@code 角色:标识}（如 {@code user:1001}、{@code admin:1}），
+     * 因此取冒号前的部分即为角色。这里也顺带做了兜底：格式不符时记为 {@code unknown}，
+     * 保证监控上不会出现 null 标签（Micrometer 不接受 null 标签值）。
+     */
+    private String roleOf(String actor) {
+        if (actor == null || actor.isBlank()) {
+            return "unknown";
+        }
+        int idx = actor.indexOf(':');
+        return idx > 0 ? actor.substring(0, idx) : actor;
     }
 
     /**

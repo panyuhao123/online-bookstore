@@ -2,6 +2,7 @@ package cn.edu.bookstore.service.impl;
 
 import cn.edu.bookstore.common.BusinessException;
 import cn.edu.bookstore.common.ErrorCode;
+import cn.edu.bookstore.common.observability.BusinessMetrics;
 import cn.edu.bookstore.common.security.LoginAttemptGuard;
 import cn.edu.bookstore.common.util.JwtUtil;
 import cn.edu.bookstore.common.util.PasswordUtil;
@@ -67,6 +68,13 @@ class UserServiceImplPasswordUpgradeTest {
 
     @Mock
     private LoginAttemptGuard loginAttemptGuard;
+
+    /**
+     * 埋点门面。这里必须是 mock：登录链路会调用它，
+     * 若注入 null 会在写埋点时抛 NPE，把「登录功能测试」变成「埋点测试」。
+     */
+    @Mock
+    private BusinessMetrics businessMetrics;
 
     @InjectMocks
     private UserServiceImpl userService;
@@ -144,6 +152,8 @@ class UserServiceImplPasswordUpgradeTest {
         // 失败锁定是登录安全的另一半：口令校验失败必须真正落到计数器上，否则等于没接
         verify(loginAttemptGuard).recordFailure("user", PHONE);
         verify(loginAttemptGuard, never()).reset(any(), any());
+        // 埋点：失败必须计入指标，否则「登录失败率」这个最关键的监控项是空的
+        verify(businessMetrics).loginAttempt("user", BusinessMetrics.RESULT_FAILURE);
     }
 
     @Test
@@ -156,6 +166,7 @@ class UserServiceImplPasswordUpgradeTest {
 
         verify(loginAttemptGuard).reset("user", PHONE);
         verify(loginAttemptGuard, never()).recordFailure(any(), any());
+        verify(businessMetrics).loginAttempt("user", BusinessMetrics.RESULT_SUCCESS);
     }
 
     @Test
@@ -168,6 +179,8 @@ class UserServiceImplPasswordUpgradeTest {
 
         assertEquals(ErrorCode.BIZ_ERROR, ex.getErrorCode());
         verify(userMapper, never()).selectOne(any(Wrapper.class));
+        // 被锁定与口令错误的埋点结果分开记：失败量飙升但锁定量为 0，说明阈值还没起作用
+        verify(businessMetrics).loginAttempt("user", BusinessMetrics.RESULT_LOCKED);
     }
 
     @Test

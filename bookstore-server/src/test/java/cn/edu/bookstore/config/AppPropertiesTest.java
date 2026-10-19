@@ -127,4 +127,24 @@ class AppPropertiesTest {
         max.getJwt().setExpireHours(720);
         assertDoesNotThrow(max::validate);
     }
+
+    @Test
+    @DisplayName("业务埋点默认开启，且默认配置下自检通过")
+    void observabilityDefaultsToEnabled() {
+        AppProperties p = props(VALID_SECRET);
+
+        assertTrue(p.getObservability().isMetricsEnabled(),
+                "埋点应默认开启；默认关闭会让 /actuator/metrics 永远空空如也，"
+                        + "排查线上问题时才发现就已经晚了");
+        assertDoesNotThrow(p::validate);
+    }
+
+    @Test
+    @DisplayName("关闭业务埋点 → 仍通过自检（埋点开关属于可选能力，不能阻断启动）")
+    void disabledMetricsStillPassesValidation() {
+        AppProperties p = props(VALID_SECRET);
+        p.getObservability().setMetricsEnabled(false);
+
+        assertDoesNotThrow(p::validate);
+    }
 }

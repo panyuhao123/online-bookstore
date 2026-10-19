@@ -1,8 +1,12 @@
 package cn.edu.bookstore.common.security;
 
+import cn.edu.bookstore.common.observability.BusinessMetrics;
 import cn.edu.bookstore.common.util.JwtUtil;
 import cn.edu.bookstore.config.AppProperties;
 import com.auth0.jwt.interfaces.DecodedJWT;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -64,6 +68,8 @@ class TokenRevocationServiceTest {
 
     private AppProperties appProperties;
     private JwtUtil jwtUtil;
+    private MeterRegistry meterRegistry;
+    private BusinessMetrics businessMetrics;
     private TokenRevocationService service;
 
     @BeforeEach
@@ -72,7 +78,11 @@ class TokenRevocationServiceTest {
         appProperties.getJwt().setSecret(SECRET);
         appProperties.getJwt().setExpireHours(24);
         jwtUtil = new JwtUtil(appProperties);
-        service = new TokenRevocationService(redisTemplate, appProperties, jwtUtil);
+        // 用 SimpleMeterRegistry（Micrometer 自带的内存实现）承接埋点，
+        // 这样测试里既能构造真实的 BusinessMetrics，又不需要引入监控后端
+        meterRegistry = new SimpleMeterRegistry();
+        businessMetrics = new BusinessMetrics(meterRegistry, appProperties);
+        service = new TokenRevocationService(redisTemplate, appProperties, jwtUtil, businessMetrics);
     }
 
     /** 让 Redis 走「正常可用」分支 */
@@ -216,5 +226,49 @@ class TokenRevocationServiceTest {
         service.revoke(JTI, new Date(System.currentTimeMillis() + ONE_HOUR_MS), null);
 
         verify(valueOperations).set(eq("bookstore:token:revoked:" + JTI), eq("1"), any(Duration.class));
+    }
+
+    @Test
+    @DisplayName("埋点：吊销成功时按角色计数（标签取 actor 冒号前的角色段）")
+    void revokeRecordsMetricWithRole() {
+        redisWorks();
+
+        service.revoke(JTI, new Date(System.currentTimeMillis() + ONE_HOUR_MS), "admin:1");
+
+        assertEquals(1.0, countOf(BusinessMetrics.METRIC_TOKEN_REVOKED, "role", "admin"),
+                "吊销一枚管理员令牌应让 role=admin 的计数器 +1");
+    }
+
+    @Test
+    @DisplayName("埋点：开关关闭时不计数（应急出口不应留下指标噪声）")
+    void disabledRevocationDoesNotRecordMetric() {
+        appProperties.getJwt().getRevocation().setEnabled(false);
+
+        service.revoke(JTI, new Date(System.currentTimeMillis() + ONE_HOUR_MS), "user:1001");
+
+        assertEquals(0.0, countOf(BusinessMetrics.METRIC_TOKEN_REVOKED, "role", "user"));
+    }
+
+    @Test
+    @DisplayName("埋点：过期令牌与无 jti 令牌都不计数（没有真正吊销）")
+    void ineffectiveRevokeDoesNotRecordMetric() {
+        redisWorks();
+
+        service.revoke(JTI, new Date(System.currentTimeMillis() - 1000L), "user:1001");
+        service.revoke("   ", new Date(System.currentTimeMillis() + ONE_HOUR_MS), "user:1001");
+
+        assertEquals(0.0, countOf(BusinessMetrics.METRIC_TOKEN_REVOKED, "role", "user"));
+    }
+
+    /**
+     * 读取指定标签组合下的计数器值；计数器尚未注册时返回 0。
+     *
+     * <p>这里用 {@code registry.find(...)} 而不是 {@code registry.get(...)}：
+     * 后者在计数器不存在时会直接抛 MeterNotFoundException，而「从未计数」正是本测试
+     * 要断言的场景之一，必须能拿到 0 而不是异常。
+     */
+    private double countOf(String name, String tagKey, String tagValue) {
+        Counter counter = meterRegistry.find(name).tag(tagKey, tagValue).counter();
+        return counter == null ? 0.0 : counter.count();
     }
 }

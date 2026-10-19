@@ -24,10 +24,10 @@ public class Admin {
     /** 登录账号 */
     private String username;
 
-    /** 密码密文 = MD5(明文 + salt) */
+    /** 密码密文：BCrypt（新数据）或 MD5(明文 + salt)（待升级的历史数据） */
     private String password;
 
-    /** 密码随机盐值 */
+    /** 历史遗留盐值：BCrypt 数据下为空串（盐已编码进密文），仅为兼容旧 MD5 记录保留 */
     private String salt;
 
     private String realName;

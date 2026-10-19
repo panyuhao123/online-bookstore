@@ -1,0 +1,82 @@
+# =====================================================================
+# 生产 profile —— 通过 SPRING_PROFILES_ACTIVE=prod 激活
+#
+# 说明：本文件是 application.yml 的「覆盖层」，只写与生产不同的部分。
+#      数据库口令、JWT 密钥、对象存储凭证等仍通过环境变量注入，
+#      绝不写进本文件（本文件会随代码库提交）。
+#
+# 启动示例：
+#   SPRING_PROFILES_ACTIVE=prod \
+#   DB_PASSWORD=xxx JWT_SECRET=xxx \
+#   java -jar bookstore-server.jar
+# =====================================================================
+
+spring:
+  # 生产环境只暴露健康检查，prometheus/metrics 等需显式开启
+  # （Spring Boot 的 /actuator/health 给负载均衡/容器编排做存活探测）
+  sql:
+    init:
+      # 生产不允许启动时自动执行 schema/data 脚本，避免误改线上数据结构
+      mode: never
+
+# ---------------- 关闭 MyBatis SQL 日志 ----------------
+# 开发环境打印 SQL 方便答辩讲解与排错；生产环境打印 SQL 既拖慢性能，
+# 也会把用户数据（手机号、地址等）写进日志文件，属于典型的信息泄露风险。
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+
+# ---------------- 关闭接口文档入口 ----------------
+# Knife4j / Swagger 会完整暴露所有接口定义（含入参结构），
+# 相当于把系统的「地图」公开，生产环境必须关闭。
+# 注意：光设 knife4j.enable=false 不够 —— /doc.html 是静态页，照样能打开。
+# 必须同时把 bookstore.docs.enabled 设为 false，安全配置才会拒绝这些路径。
+# 真机演示/答辩时如需查看文档，请用 local profile 启动。
+bookstore:
+  docs:
+    enabled: false
+  jwt:
+    # 生产环境令牌有效期进一步收敛为 12 小时（本地开发 24 小时）：
+    # 管理端令牌尤其敏感（持有即可操作商品、订单、用户），
+    # 而 JWT 在过期前无法被远程作废，只能靠吊销黑名单或等它过期，因此宁可让用户多登一次。
+    # 后端返回给前端的 expireHours 会随之变为 12，前端无需改动。
+    expire-hours: ${JWT_EXPIRE_HOURS:12}
+    revocation:
+      # 令牌吊销在生产必须开启（默认即 true，此处显式写出）：
+      # 关闭后退出登录只在客户端删令牌，服务端仍认可该令牌直到过期，属于可被利用的安全缺口。
+      enabled: true
+  login-guard:
+    # 登录失败锁定在生产必须开启（默认即 true，此处显式写出，让「生产是否开了防爆破」
+    # 在配置文件里一眼可见，而不是要去翻代码里的默认值）。
+    # 阈值沿用默认的「5 次失败锁 15 分钟」——管理端没有验证码，这层是它唯一的在线防护；
+    # 若线上确实遭遇持续爆破，可调紧 max-failures，或用环境变量临时覆盖。
+    enabled: true
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+knife4j:
+  enable: false
+
+# ---------------- 监控端点收敛 ----------------
+management:
+  endpoints:
+    web:
+      exposure:
+        # 只暴露 health，其余端点（env/beans/heapdump 等）一律不开
+        include: health
+  endpoint:
+    health:
+      # 不向外部展示数据库/Redis 等组件的细节，避免暴露内部拓扑
+      show-details: never
+
+# ---------------- 日志 ----------------
+# 生产只记 INFO 及以上；业务包不再开 DEBUG（DEBUG 会打印大量流程细节，
+# 量大、且可能包含敏感字段）。
+logging:
+  level:
+    root: INFO
+    cn.edu.bookstore: INFO

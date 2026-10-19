@@ -66,9 +66,32 @@ spring.data:
 # ---------------- 业务自定义配置 ----------------
 bookstore:
   jwt:
-    # 生产环境必须通过 JWT_SECRET 环境变量注入，且长度 >= 16
-    secret: ${JWT_SECRET:bookstore-app-dev-secret-please-change-in-production}
-    expire-hours: ${JWT_EXPIRE_HOURS:72}
+    # 【安全约定】本文件会随代码库一起提交，所以这里绝不留「可用」的默认密钥 ——
+    # 一旦留了默认值，就等于把密钥公开，任何人都能自己签发令牌。
+    #   · 本地开发：真实密钥写在 application-local.yml（已被 .gitignore 忽略，不入库）
+    #   · 生产环境：通过环境变量 JWT_SECRET 注入
+    # 留空时启动即失败（AppProperties.validate 会拒绝 空值 / 历史占位值 / 长度 < 32 的密钥），
+    # 属于「快速失败」设计：宁可起不来，也不要带着公开密钥对外提供服务。
+    secret: ${JWT_SECRET:}
+    # 令牌有效期（小时）。初版为 72 小时，现收敛为 24 小时（生产 12 小时）：
+    # JWT 在过期前无法被远程作废，有效期越长，令牌一旦泄露能被利用的窗口就越长。
+    # 由于退出登录现在会在服务端吊销令牌（见 jwt.revocation），缩短有效期不再带来额外的重登困扰。
+    expire-hours: ${JWT_EXPIRE_HOURS:24}
+    # 令牌吊销（jti 黑名单）：退出登录时把令牌编号写入 Redis，之后该令牌立即失效，
+    # 而不是等它自然过期。应急出口：万一黑名单逻辑异常导致正常用户被大面积拒绝，
+    # 设 JWT_REVOCATION_ENABLED=false 重启即可回到「登出仅客户端生效」的旧行为。
+    revocation:
+      enabled: ${JWT_REVOCATION_ENABLED:true}
+  # 高德开放平台 —— Web服务API（地理编码地址自动解析）
+  # 【可选能力】key 缺失时地址解析不可用（接口返回友好错误），但服务照常启动，
+  # 不因一个第三方配置缺失就阻断整个系统。
+  gaode:
+    key: ${GAODE_KEY:}
+    secret: ${GAODE_SECRET:}
+    base-url: ${GAODE_BASE_URL:https://restapi.amap.com/v3/geocode}
+    timeout-ms: ${GAODE_TIMEOUT_MS:5000}
+    rate-limit-seconds: ${GAODE_RATE_LIMIT_SECONDS:10}
+    max-candidates: ${GAODE_MAX_CANDIDATES:5}
   upload:
     base-dir: ${UPLOAD_BASE_DIR:./upload}
     max-size-mb: ${UPLOAD_MAX_SIZE_MB:5}
@@ -96,6 +119,21 @@ bookstore:
     enabled: ${CACHE_ENABLED:true}
     ttl-minutes: ${CACHE_TTL_MINUTES:30}
     key-prefix: "bookstore:"
+  docs:
+    # 是否开放接口文档入口（/doc.html）。本地开发默认开放，便于调试与答辩演示；
+    # application-prod.yml 中已改为 false —— 生产环境暴露完整接口清单属于信息泄露。
+    enabled: ${DOCS_ENABLED:true}
+  login-guard:
+    # 登录失败锁定（防在线暴力破解）：同一账号连续失败 max-failures 次即锁定 lock-minutes 分钟。
+    # 图形验证码只能挡「无脑脚本」，挡不住「认真填对验证码再慢速试密码」，所以必须再加这一层。
+    # 不存在的账号同样计数（避免通过响应差异反推账号是否存在）；计数只按账号维度，不按 IP。
+    # 应急出口：管理员账号被锁且等不及时，临时设 LOGIN_GUARD_ENABLED=false 重启即可恢复登录。
+    enabled: ${LOGIN_GUARD_ENABLED:true}
+    max-failures: ${LOGIN_GUARD_MAX_FAILURES:5}
+    # 失败计数窗口：窗口内累加，窗口过后自动清零（否则正常用户几个月偶尔输错也会被误锁）
+    window-minutes: ${LOGIN_GUARD_WINDOW_MINUTES:30}
+    # 锁定时长：到期自动解锁，无需人工干预
+    lock-minutes: ${LOGIN_GUARD_LOCK_MINUTES:15}
   order:
     # 待支付订单超时时长（分钟）：超过该时长仍未支付，由定时任务自动取消并回补库存
     timeout-minutes: ${ORDER_TIMEOUT_MINUTES:30}

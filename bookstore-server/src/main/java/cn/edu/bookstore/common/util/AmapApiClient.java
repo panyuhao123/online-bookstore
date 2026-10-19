@@ -48,6 +48,13 @@ public class AmapApiClient {
      */
     public List<GeocodeItem> geocode(String address) {
         AppProperties.Gaode gaode = appProperties.getGaode();
+
+        // 0. 未配置 key 时提前失败：避免带着空 key 去打高德，拿回一个看不懂的 INVALID_KEY，
+        //    这里直接给出「功能未启用、请手动填写地址」的可操作提示。
+        if (StrUtil.isBlank(gaode.getKey())) {
+            throw new AmapApiException("地址自动解析功能未启用（未配置高德 key），请手动填写完整地址");
+        }
+
         String path = "/geo"; // 地理编码接口
         String baseUrl = gaode.getBaseUrl(); // https://restapi.amap.com/v3/geocode
 

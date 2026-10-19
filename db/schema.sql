@@ -22,8 +22,8 @@ DROP TABLE IF EXISTS `user`;
 CREATE TABLE `user` (
     `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     `phone`       VARCHAR(20)  NOT NULL                COMMENT '手机号（登录账号，唯一）',
-    `password`    VARCHAR(64)  NOT NULL                COMMENT '密码密文 = MD5(明文 + salt)',
-    `salt`        VARCHAR(32)  NOT NULL                COMMENT '密码随机盐值',
+    `password`    VARCHAR(64)  NOT NULL                COMMENT '密码密文：BCrypt（新数据）或历史 MD5(明文 + salt)',
+    `salt`        VARCHAR(32)  NOT NULL                COMMENT '历史遗留盐值，BCrypt 数据下为空串',
     `nickname`    VARCHAR(50)  DEFAULT NULL            COMMENT '用户昵称',
     `avatar_url`  VARCHAR(500) DEFAULT NULL            COMMENT '头像地址',
     `status`      TINYINT      NOT NULL DEFAULT 1      COMMENT '状态：1-正常 0-禁用',
@@ -41,8 +41,8 @@ DROP TABLE IF EXISTS `admin`;
 CREATE TABLE `admin` (
     `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     `username`   VARCHAR(50) NOT NULL                COMMENT '管理员账号（唯一）',
-    `password`   VARCHAR(64) NOT NULL                COMMENT '密码密文 = MD5(明文 + salt)',
-    `salt`       VARCHAR(32) NOT NULL                COMMENT '密码随机盐值',
+    `password`   VARCHAR(64) NOT NULL                COMMENT '密码密文：BCrypt（新数据）或历史 MD5(明文 + salt)',
+    `salt`       VARCHAR(32) NOT NULL                COMMENT '历史遗留盐值，BCrypt 数据下为空串',
     `real_name`  VARCHAR(50) DEFAULT NULL            COMMENT '真实姓名',
     `status`     TINYINT     NOT NULL DEFAULT 1      COMMENT '状态：1-正常 0-禁用',
     `create_time` DATETIME   NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',

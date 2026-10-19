@@ -44,13 +44,20 @@ public class SecurityConfig {
      * 匿名可访问的路径。
      *
      * <p>依据需求文档 3.1.1：图书与分类允许未登录浏览；
-     * 注册、登录、登出、健康检查、静态资源（封面图）无需令牌。
+     * 注册、登录、登出、健康检查、静态资源（封面）无需令牌。
+     *
+     * <p>登出接口（/api/user/logout、/api/admin/logout）放在这里是有意为之：
+     * 它们的语义是「让这枚令牌失效」，本身幂等，令牌已过期时也应当返回成功。
+     * 若要求先认证，用户令牌过期后再点退出就会收到 401，
+     * 反而需要前端额外处理一个没有实际意义的失败分支。
+     * 真正的吊销动作由接口内部解析请求头中的令牌完成（见 JwtUtil#resolveFromHeader）。
      */
     private static final String[] PUBLIC_PATHS = {
             "/api/user/register",
             "/api/user/login",
             "/api/user/logout",
             "/api/admin/login",
+            "/api/admin/logout",
             // 图形验证码：匿名可访问（登录/注册前必须能拿到验证码图片）
             "/api/captcha",
             "/api/captcha/**",
@@ -68,17 +75,26 @@ public class SecurityConfig {
             "/ready",
             "/files/**",
             "/error",
-            // 接口文档（Knife4j / springdoc）：文档页面本身不含业务数据，
-            // 且调试时需要匿名加载静态资源；真正的接口调用仍要带令牌。
-            // 注意：生产环境应把 /doc.html 与 /v3/api-docs/** 关掉或加访问限制，
-            // 否则会把全部接口清单暴露出去。本项目为教学演示，故默认开放。
+            "/favicon.ico"
+    };
+
+    /**
+     * 接口文档相关路径（Knife4j / springdoc）。
+     *
+     * <p>注意 /doc.html 是一个<b>静态页面</b>：即使 knife4j.enable=false，
+     * 页面本身依然能打开（只是取不到接口数据）。所以要真正关掉文档入口，
+     * 必须在安全层把这些路径一起摘掉，仅靠关配置是不够的。
+     *
+     * <p>由 {@code bookstore.docs.enabled} 控制：
+     * 本地开发 true（放行，便于调试与答辩演示）；生产 false（显式拒绝）。
+     */
+    private static final String[] DOC_PATHS = {
             "/doc.html",
             "/webjars/**",
             "/v3/api-docs/**",
             "/swagger-ui/**",
             "/swagger-ui.html",
-            "/swagger-resources/**",
-            "/favicon.ico"
+            "/swagger-resources/**"
     };
 
     private final AppProperties appProperties;
@@ -97,14 +113,23 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(registry -> registry
-                        // 跨域预检请求不含令牌，必须放行
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers(PUBLIC_PATHS).permitAll()
-                        // 后台接口：必须是管理员角色（APP 用户令牌访问返回 403）
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        // 其余接口（购物车、地址、订单等）必须登录
-                        .anyRequest().authenticated())
+                .authorizeHttpRequests(registry -> {
+                    // 跨域预检请求不含令牌，必须放行
+                    registry.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                            .requestMatchers(PUBLIC_PATHS).permitAll();
+                    // 接口文档：按 bookstore.docs.enabled 决定放行还是拒绝。
+                    // 关闭时用 denyAll（而不是「不写规则」），让意图明确、日志里也能看出来。
+                    if (appProperties.getDocs().isEnabled()) {
+                        registry.requestMatchers(DOC_PATHS).permitAll();
+                    } else {
+                        registry.requestMatchers(DOC_PATHS).denyAll();
+                    }
+                    registry
+                            // 后台接口：必须是管理员角色（APP 用户令牌访问返回 403）
+                            .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                            // 其余接口（购物车、地址、订单等）必须登录
+                            .anyRequest().authenticated();
+                })
                 .exceptionHandling(handling -> handling
                         .authenticationEntryPoint(restAuthExceptionHandler)
                         .accessDeniedHandler(restAuthExceptionHandler))

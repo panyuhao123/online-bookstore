@@ -1,7 +1,6 @@
 package cn.edu.bookstore.config;
 
 import jakarta.annotation.PostConstruct;
-import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -27,6 +26,25 @@ import java.util.List;
 @ConfigurationProperties(prefix = "bookstore")
 public class AppProperties {
 
+    /**
+     * JWT 密钥最小长度。
+     *
+     * <p>HS256 的密钥强度取决于其长度，业界建议不低于 256 bit（32 字节），
+     * 因此这里要求至少 32 个字符。旧版本只要求 16 位，强度不足，已上调。
+     */
+    private static final int MIN_JWT_SECRET_LENGTH = 32;
+
+    /**
+     * 历史版本中出现过的占位密钥，一律视为「已公开的密钥」，禁止用于启动。
+     *
+     * <p>它们曾随代码库提交，任何人都能拿到；只要还在用，令牌就能被伪造。
+     */
+    private static final List<String> PLACEHOLDER_JWT_SECRETS = List.of(
+            "bookstore-app-dev-secret-please-change-in-production",
+            "please-change-in-production",
+            "change-me", "changeme", "changeit", "your-secret-key", "secret", "123456"
+    );
+
     /** JWT 相关配置 */
     private Jwt jwt = new Jwt();
 
@@ -51,15 +69,114 @@ public class AppProperties {
     /** 支付相关配置 */
     private Pay pay = new Pay();
 
+    /** 接口文档开关（Knife4j / springdoc 的 /doc.html 入口） */
+    private Docs docs = new Docs();
+
+    /** 登录失败锁定（防在线暴力破解） */
+    private LoginGuard loginGuard = new LoginGuard();
+
+    /**
+     * 登录失败锁定配置。
+     *
+     * <p>为什么需要：图形验证码只能挡住「无脑脚本」，挡不住「人工慢速试密码」。
+     * 攻击者拿到一个手机号后，可以每次认真填对验证码、再猜一个密码，
+     * 这类攻击在验证码视角下完全正常。真正有效的手段是**限制同一账号的连续失败次数**：
+     * 失败 N 次后把该账号临时锁住，把「无限次尝试」压成「每 15 分钟 5 次」，
+     * 使穷举在时间维度上不可行。
+     *
+     * <p>与「账号是否真实存在」无关：不存在的账号同样计数，避免通过响应差异反推账号是否存在。
+     */
+    @Data
+    public static class LoginGuard {
+
+        /**
+         * 是否启用登录失败锁定。
+         *
+         * <p>留了开关是为了应急：万一管理员账号被锁且无法等待解锁，
+         * 可临时设 false 重启服务恢复登录（这是唯一「必然可用」的出口）。
+         */
+        private boolean enabled = true;
+
+        /**
+         * 触发锁定所需的连续失败次数。
+         *
+         * <p>默认 5 次：给正常用户留了足够的「手滑」空间（家人手机的密码框很容易输错两三次），
+         * 同时把攻击者的尝试速率压到很低。
+         */
+        private int maxFailures = 5;
+
+        /**
+         * 失败计数的窗口时长（分钟）。
+         *
+         * <p>计数不是永久的：窗口内失败累计到阈值才锁定；窗口过后计数自动清零。
+         * 若不设窗口，正常用户长期偶发输错（几个月错 5 次）也会被误锁。
+         */
+        private int windowMinutes = 30;
+
+        /** 触发锁定后的锁定时长（分钟）；到期自动解锁，无需人工干预 */
+        private int lockMinutes = 15;
+    }
+
+    /**
+     * 接口文档配置。
+     *
+     * <p>为什么需要一个显式开关：Knife4j 的 /doc.html 是一个静态页面，
+     * 仅靠 {@code knife4j.enable=false} 并不会让它消失 —— 页面照样能打开，
+     * 只是取不到接口数据。要真正「在生产环境关掉文档入口」，
+     * 必须在安全配置里把相关路径从白名单摘掉并显式拒绝。
+     */
+    @Data
+    public static class Docs {
+        /**
+         * 是否开放接口文档入口。
+         *
+         * <p>true-开放（本地开发/答辩演示需要看文档）；false-关闭（生产环境）。
+         * application-prod.yml 中已设为 false。
+         */
+        private boolean enabled = true;
+    }
+
     /** JWT 令牌配置 */
     @Data
     public static class Jwt {
-        /** 签名密钥，生产环境必须通过环境变量注入 */
-        @NotBlank(message = "bookstore.jwt.secret 不能为空")
-        private String secret = "bookstore-app-dev-secret-please-change-in-production";
+        /**
+         * 签名密钥。
+         *
+         * <p>默认留空 —— 不提供可用默认值。真实密钥必须由
+         * application-local.yml（本地开发，不入库）或环境变量 JWT_SECRET（生产）注入。
+         * 留空时启动直接失败（见 {@link #validate()}），避免用公开默认密钥签发令牌。
+         */
+        private String secret = "";
 
-        /** 访问令牌有效期（小时），毕设场景可放长一些，避免频繁重新登录 */
-        private int expireHours = 72;
+        /**
+         * 访问令牌有效期（小时）。
+         *
+         * <p>取值是一次安全与体验的取舍：太长则令牌一旦泄露，攻击者能用的时间窗口就长
+         * （JWT 无法像会话那样随时作废，只能靠吊销黑名单或等它过期）；太短则用户频繁被踢回登录页。
+         *
+         * <p>本项目从初版的 72 小时收敛为 24 小时（生产 12 小时），
+         * 理由是 72 小时已超出「一次移动端会话」的合理范围，
+         * 而退出登录现在会在服务端吊销令牌，缩短有效期不会再带来额外的重登困扰。
+         */
+        private int expireHours = 24;
+
+        /** 令牌吊销配置（退出登录在服务端生效） */
+        private Revocation revocation = new Revocation();
+
+        /**
+         * 令牌吊销（jti 黑名单）配置。
+         *
+         * <p>无状态 JWT 的退出登录只在客户端删令牌，服务端仍认这枚令牌直到它过期。
+         * 打开本项后，退出登录会把令牌编号写入黑名单，每个请求校验一次，使退出真正生效。
+         *
+         * <p>留开关的用途：万一黑名单逻辑出现故障导致正常用户被大面积拒绝，
+         * 可立即设 {@code JWT_REVOCATION_ENABLED=false} 重启恢复访问（此时回到「登出仅客户端生效」的旧行为）。
+         */
+        @Data
+        public static class Revocation {
+            /** 是否启用令牌吊销校验 */
+            private boolean enabled = true;
+        }
     }
 
     /** 文件上传配置 */
@@ -138,16 +255,16 @@ public class AppProperties {
      *
      * <p>安全说明：
      * <ul>
-     *     <li>key 必须配置，secret 可选；secret 留空时自动降级为「仅 key」模式，
-     *         此时高德控制台需选择「key 安全模式」；</li>
+     *     <li>key 可选：缺失时地址自动解析功能不可用（调用时返回友好错误），但服务照常启动，
+     *         不因第三方配置缺失就阻断整个系统；</li>
+     *     <li>secret 可选；留空时自动降级为「仅 key」模式，此时高德控制台需选择「key 安全模式」；</li>
      *     <li>secret 用于数字签名 sig=MD5(sort(params) + secret)，防止他人盗用 key；</li>
      *     <li>key 和 secret 只在 application-local.yml 或环境变量中配置，绝不硬编码。</li>
      * </ul>
      */
     @Data
     public static class Gaode {
-        /** Web服务API key（高德控制台申请） */
-        @NotBlank(message = "bookstore.gaode.key 不能为空")
+        /** Web服务API key（高德控制台申请）；留空表示未启用地址解析能力 */
         private String key = "";
 
         /** 签名密钥（高德控制台「签名管理」开启后生成）；留空则仅用 key 模式 */
@@ -267,9 +384,7 @@ public class AppProperties {
      */
     @PostConstruct
     public void validate() {
-        if (jwt.getSecret().length() < 16) {
-            throw new IllegalStateException("配置校验失败：bookstore.jwt.secret 长度不能少于 16 位");
-        }
+        validateJwtSecret();
         if (upload.getMaxSizeMb() <= 0 || upload.getMaxSizeMb() > 50) {
             throw new IllegalStateException("配置校验失败：bookstore.upload.max-size-mb 需在 1~50 之间");
         }
@@ -300,9 +415,81 @@ public class AppProperties {
             log.warn("支付渠道已切换为支付宝沙箱（appId={}），请确认已配置回调地址且沙箱账号可用",
                     pay.getAlipay().getAppId());
         }
-        log.info("配置加载完成：jwtExpireHours={}, uploadBaseDir={}, storageType={}, allowedOrigins={}, "
-                        + "orderTimeoutMinutes={}, autoCancelEnabled={}, payType={}",
-                jwt.getExpireHours(), upload.getBaseDir(), storage.getType(), cors.getAllowedOrigins(),
-                order.getTimeoutMinutes(), order.isAutoCancelEnabled(), pay.getType());
+
+        // 登录失败锁定：阈值写错会让保护彻底失效（比如 0 次就锁、或负数导致永不触发），
+        // 这两类错误在运行时都很难察觉，所以在启动期就拦住。
+        if (loginGuard.getMaxFailures() <= 0 || loginGuard.getMaxFailures() > 100) {
+            throw new IllegalStateException(
+                    "配置校验失败：bookstore.login-guard.max-failures 需在 1~100 之间");
+        }
+        if (loginGuard.getWindowMinutes() <= 0) {
+            throw new IllegalStateException("配置校验失败：bookstore.login-guard.window-minutes 必须大于 0");
+        }
+        if (loginGuard.getLockMinutes() <= 0) {
+            throw new IllegalStateException("配置校验失败：bookstore.login-guard.lock-minutes 必须大于 0");
+        }
+        if (!loginGuard.isEnabled()) {
+            log.warn("安全提示：登录失败锁定已被关闭（bookstore.login-guard.enabled=false），"
+                    + "账号可被无限次尝试口令，请确认这是临时排障行为");
+        }
+
+        // 令牌有效期：过长会把「令牌泄露」的风险窗口放大到难以接受的程度
+        // （JWT 一旦签发，在过期前无法被远程作废，除非命中吊销黑名单）。
+        if (jwt.getExpireHours() <= 0 || jwt.getExpireHours() > 720) {
+            throw new IllegalStateException(
+                    "配置校验失败：bookstore.jwt.expire-hours 需在 1~720 小时之间，当前为 " + jwt.getExpireHours());
+        }
+        if (!jwt.getRevocation().isEnabled()) {
+            log.warn("安全提示：令牌吊销已关闭（bookstore.jwt.revocation.enabled=false），"
+                    + "退出登录将只在客户端生效，已登出的令牌在过期前仍然可用");
+        }
+
+        // 高德 key 属「可选能力」：没配只是地址自动解析用不了，不该拖垮整个服务。
+        boolean gaodeEnabled = gaode.getKey() != null && !gaode.getKey().isBlank();
+        if (!gaodeEnabled) {
+            log.warn("提示：未配置 bookstore.gaode.key，地址自动解析功能不可用（手动填写地址不受影响）。"
+                    + "需要该功能时请在环境变量 GAODE_KEY 或 application-local.yml 中配置。");
+        }
+
+        log.info("配置加载完成：jwtExpireHours={}, tokenRevocationEnabled={}, uploadBaseDir={}, storageType={}, "
+                        + "allowedOrigins={}, orderTimeoutMinutes={}, autoCancelEnabled={}, payType={}, "
+                        + "gaodeEnabled={}, docsEnabled={}, loginGuardEnabled={}, maxFailures={}, lockMinutes={}",
+                jwt.getExpireHours(), jwt.getRevocation().isEnabled(), upload.getBaseDir(), storage.getType(),
+                cors.getAllowedOrigins(), order.getTimeoutMinutes(), order.isAutoCancelEnabled(), pay.getType(),
+                gaodeEnabled, docs.isEnabled(), loginGuard.isEnabled(),
+                loginGuard.getMaxFailures(), loginGuard.getLockMinutes());
+    }
+
+    /**
+     * JWT 密钥校验（快速失败的核心）。
+     *
+     * <p>密钥是整套鉴权体系的唯一秘密：一旦为空、可猜（历史占位值）或过短，
+     * 任何人都能自行签发出合法令牌冒充任意用户。因此这里的策略是「宁可起不来」：
+     * <ol>
+     *     <li>空值 → 拒绝启动（application.yml 不再提供可用默认值）；</li>
+     *     <li>命中历史占位值 → 拒绝启动（该值已随代码库公开，等于没有秘密）；</li>
+     *     <li>长度 &lt; 32 → 拒绝启动（HS256 建议密钥长度不小于 256 bit）。</li>
+     * </ol>
+     */
+    private void validateJwtSecret() {
+        String secret = jwt.getSecret() == null ? "" : jwt.getSecret().trim();
+        if (secret.isEmpty()) {
+            throw new IllegalStateException("配置校验失败：bookstore.jwt.secret 未配置。"
+                    + "本地开发请在 application-local.yml 中配置；"
+                    + "生产环境请通过环境变量 JWT_SECRET 注入长度 >= " + MIN_JWT_SECRET_LENGTH + " 的随机串。");
+        }
+        String lower = secret.toLowerCase();
+        if (PLACEHOLDER_JWT_SECRETS.contains(lower) || lower.contains("please-change-in-production")) {
+            throw new IllegalStateException("配置校验失败：bookstore.jwt.secret 仍是历史默认占位值，"
+                    + "该值已随代码库公开、不能作为密钥使用；请更换为长度 >= "
+                    + MIN_JWT_SECRET_LENGTH + " 的随机串（可用 openssl rand -base64 48 生成）。");
+        }
+        if (secret.length() < MIN_JWT_SECRET_LENGTH) {
+            throw new IllegalStateException("配置校验失败：bookstore.jwt.secret 长度不能少于 "
+                    + MIN_JWT_SECRET_LENGTH + " 位（当前 " + secret.length() + " 位）。"
+                    + "可用 openssl rand -base64 48 生成一个随机密钥。");
+        }
+        // 回写去掉首尾空格后的值，避免「配置里带了换行/空格」导致签名行为难以排查
+        jwt.setSecret(secret);
     }
 }

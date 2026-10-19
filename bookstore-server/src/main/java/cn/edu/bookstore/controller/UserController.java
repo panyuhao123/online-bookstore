@@ -1,12 +1,14 @@
 package cn.edu.bookstore.controller;
 
 import cn.edu.bookstore.common.Result;
+import cn.edu.bookstore.common.util.JwtUtil;
 import cn.edu.bookstore.common.web.LoginUserHolder;
 import cn.edu.bookstore.model.dto.LoginRequest;
 import cn.edu.bookstore.model.dto.RegisterRequest;
 import cn.edu.bookstore.model.vo.LoginVO;
 import cn.edu.bookstore.model.vo.UserVO;
 import cn.edu.bookstore.service.UserService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -44,11 +46,16 @@ public class UserController {
     /**
      * 退出登录。
      *
-     * <p>JWT 无状态，服务端不保存令牌，因此退出由客户端删除本地令牌完成；
-     * 本接口只做显式记录，保证 APP 端流程完整、便于论文中描述。
+     * <p>本接口位于安全白名单（无需认证即可访问），语义是「让这枚令牌立即失效」，
+     * 因此设计成<b>幂等</b>：令牌缺失、已过期或已经登出过，都返回成功 ——
+     * 目标状态已经达成，不该反过来给用户报错。
+     *
+     * <p>因为不走认证上下文，这里从请求头自行解析令牌（与认证过滤器共用同一套解析规则），
+     * 交给服务层写入吊销黑名单。客户端同时删除本地令牌，双重保障。
      */
     @PostMapping("/logout")
-    public Result<Void> logout() {
+    public Result<Void> logout(HttpServletRequest request) {
+        userService.logout(JwtUtil.resolveFromHeader(request));
         return Result.success();
     }
 

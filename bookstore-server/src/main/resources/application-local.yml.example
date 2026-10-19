@@ -1,0 +1,56 @@
+# =====================================================================
+# 本地开发 profile —— 配置模板（可提交入库，不含任何真实凭据）
+#
+# 使用方法：
+#   1. 复制本文件为同目录下的 application-local.yml
+#        Windows:  copy application-local.yml.example application-local.yml
+#        macOS/Linux:  cp application-local.yml.example application-local.yml
+#   2. 把下面所有 <...> 占位值替换成本机真实值
+#   3. 启动（默认 profile 就是 local，无需额外参数；也可显式指定）
+#         mvn spring-boot:run -Dspring-boot.run.arguments=--server.port=8080
+#
+# 为什么要有这个模板：
+#   application-local.yml 里含数据库口令、JWT 密钥等真实凭据，
+#   已加入 .gitignore，不随代码库分发。新克隆仓库的人若没有模板，
+#   会因为「找不到本地配置」而启动失败（后端对缺少 JWT 密钥是快速失败设计）。
+# =====================================================================
+
+spring:
+  datasource:
+    # 注意：Connector/J 8 不支持 characterEncoding=utf8mb4，必须写成 utf8
+    url: jdbc:mysql://127.0.0.1:3306/bookstore?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
+    username: <你的MySQL用户名，通常是 root>
+    password: <你的MySQL口令>
+
+bookstore:
+  jwt:
+    # 必填。长度不少于 32 位，且不能使用历史默认占位值（启动时会校验并拒绝）。
+    # 生成随机密钥：openssl rand -base64 48
+    secret: <请填写至少32位的随机字符串>
+
+  # 文件上传 —— 用绝对路径，避免 jar 启动时工作目录不同导致找不到 upload 目录
+  upload:
+    base-dir: <上传文件落盘目录的绝对路径，例如 D:/bookstore/upload>
+
+  # 高德开放平台 —— Web服务API（地理编码：把用户输入的地址文本解析成标准省市区）
+  # 【可选】不配置也不影响启动，只是「地址自动解析」按钮不可用，用户手动填写地址即可。
+  gaode:
+    key: <高德控制台申请的 Web服务API key，可留空>
+    secret: <签名密钥；未在高德控制台开启「数字签名」则留空，自动降级为仅 key 模式>
+    base-url: "https://restapi.amap.com/v3/geocode"
+    timeout-ms: 5000
+    rate-limit-seconds: 10
+    max-candidates: 5
+
+  # 跨域白名单：管理后台 vite 默认 5173（被占会自动换到 5174），
+  # uni-app H5 用户端用 5175/5176，这里全部放行，避免端口漂移后前端报「网络异常」
+  cors:
+    allowed-origins:
+      - http://localhost:5173
+      - http://127.0.0.1:5173
+      - http://localhost:5174
+      - http://127.0.0.1:5174
+      - http://localhost:5175
+      - http://127.0.0.1:5175
+      - http://localhost:5176
+      - http://127.0.0.1:5176

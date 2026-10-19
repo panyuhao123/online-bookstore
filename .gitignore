@@ -1,12 +1,23 @@
 # ===== 敏感配置 =====
 .env
 *.local.yml
+# 注意：上面的 *.local.yml 只能匹配「xxx.local.yml」（点号分隔），
+# 匹配不到本项目实际使用的 application-local.yml（短横线分隔）。
+# 历史上一度因此把含数据库口令 / JWT 密钥的文件提交进了仓库，所以这里显式再补一条，别删。
+*-local.yml
+# 模板文件需要入库，显式排除，避免被上面的规则误伤
+!*-local.yml.example
+!*.local.yml.example
 
 # ===== 后端 =====
 target/
 !.mvn/wrapper/maven-wrapper.jar
 *.log
 upload/
+
+# ===== Python（tools/ 下的验证脚本）=====
+__pycache__/
+*.py[cod]
 
 # ===== 前端（uni-app / Vue） =====
 node_modules/

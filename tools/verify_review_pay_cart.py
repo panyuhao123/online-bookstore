@@ -70,17 +70,34 @@ def q(value):
     return urllib.parse.quote(str(value), safe="")
 
 
-def login(path, payload):
-    st, js = req("POST", path, payload)
-    return (js.get("data", {}) or {}).get("token") if js.get("code") == 200 else None, js
-
-
 def redis_cli(*args):
     try:
         out = subprocess.run([REDIS_CLI] + list(args), capture_output=True, timeout=10)
         return out.stdout.decode("utf-8", "replace").strip()
     except Exception as e:  # noqa: BLE001
         return "__ERR__:" + str(e)
+
+
+def fill_captcha(path, payload):
+    """APP 用户登录已强制图形验证码，这里补上 captchaKey + captchaCode。
+
+    验证码是图片，脚本无法自动识别；本地 E2E 直接从 Redis 读回本次验证码明文。
+    这只是测试侧取数手段，不依赖任何服务端测试后门，也不改动应用代码。
+    """
+    if "/user/login" not in path:
+        return payload
+    _, js = req("GET", "/api/captcha")
+    key = (js.get("data") or {}).get("captchaKey")
+    if key:
+        code = redis_cli("-h", "127.0.0.1", "-p", "6379", "get", "bookstore:captcha:" + key)
+        if code and not code.startswith("__ERR__"):
+            return dict(payload, captchaKey=key, captchaCode=code)
+    return payload
+
+
+def login(path, payload):
+    st, js = req("POST", path, fill_captcha(path, payload))
+    return (js.get("data", {}) or {}).get("token") if js.get("code") == 200 else None, js
 
 
 def cart_items(token):

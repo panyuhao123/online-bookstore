@@ -59,8 +59,31 @@ def raw_get(path):
         return e.code, e.read().decode("utf-8", "replace")
 
 
+def redis_get(key):
+    r = subprocess.run([REDIS_CLI, "-h", "127.0.0.1", "-p", "6379", "get", key],
+                       capture_output=True, timeout=5)
+    return r.stdout.decode("utf-8", "replace").strip()
+
+
+def fill_captcha(path, payload):
+    """APP 用户登录已强制图形验证码，这里补上 captchaKey + captchaCode。
+
+    验证码是图片，脚本无法自动识别；本地 E2E 直接从 Redis 读回本次验证码明文。
+    这只是测试侧取数手段，不依赖任何服务端测试后门，也不改动应用代码。
+    """
+    if "/user/login" not in path:
+        return payload
+    _, js = jreq("GET", "/api/captcha")
+    key = (js.get("data") or {}).get("captchaKey")
+    if key:
+        code = redis_get("bookstore:captcha:" + key)
+        if code:
+            return dict(payload, captchaKey=key, captchaCode=code)
+    return payload
+
+
 def login(path, payload):
-    _, js = jreq("POST", path, payload)
+    _, js = jreq("POST", path, fill_captcha(path, payload))
     return (js.get("data") or {}).get("token") if js.get("code") == 200 else None
 
 

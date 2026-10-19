@@ -15,6 +15,7 @@
 """
 import json
 import os
+import subprocess
 import urllib.request
 import urllib.error
 import uuid
@@ -22,6 +23,7 @@ import io
 
 # 后端地址与演示账号均可用环境变量覆盖，便于切换实例 / 真机联调
 BASE = os.environ.get("BOOKSTORE_BASE", "http://127.0.0.1:8080")
+REDIS_CLI = os.environ.get("BOOKSTORE_REDIS_CLI", "D:/redis5/redis-cli.exe")
 
 ADMIN_USER = os.environ.get("BOOKSTORE_ADMIN_USER", "admin")
 ADMIN_PWD = os.environ.get("BOOKSTORE_ADMIN_PWD", "123456")
@@ -99,8 +101,35 @@ def make_png():
             + chunk(b"IDAT", idat) + chunk(b"IEND", b""))
 
 
+def redis_get(key):
+    """读取一个 Redis 字符串键；仅用于取回图形验证码明文（见 fill_captcha）"""
+    try:
+        out = subprocess.run([REDIS_CLI, "-h", "127.0.0.1", "-p", "6379", "get", key],
+                             capture_output=True, timeout=5)
+        return out.stdout.decode("utf-8", "replace").strip()
+    except Exception:
+        return ""
+
+
+def fill_captcha(path, payload):
+    """APP 用户登录已强制图形验证码，这里补上 captchaKey + captchaCode。
+
+    验证码是图片，脚本无法自动识别；本地 E2E 直接从 Redis 读回本次验证码明文。
+    这只是测试侧取数手段，不依赖任何服务端测试后门，也不改动应用代码。
+    """
+    if "/user/login" not in path:
+        return payload
+    _, js = jreq("GET", "/api/captcha")
+    key = (js.get("data") or {}).get("captchaKey")
+    if key:
+        code = redis_get("bookstore:captcha:" + key)
+        if code:
+            return dict(payload, captchaKey=key, captchaCode=code)
+    return payload
+
+
 def login(path, payload):
-    st, js = jreq("POST", path, payload)
+    st, js = jreq("POST", path, fill_captcha(path, payload))
     return js.get("data", {}).get("token") if js.get("code") == 200 else None, js
 
 

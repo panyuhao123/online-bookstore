@@ -47,8 +47,10 @@ DB_PORT = os.environ.get("BOOKSTORE_DB_PORT", "3306")
 DB_USER = os.environ.get("BOOKSTORE_DB_USER", "root")
 MAIN_DB = os.environ.get("BOOKSTORE_DB_NAME", "bookstore")
 
-# 期望的迁移版本（V1 建表 / V2 索引 / V3 操作日志 / V4 评价 / V5 地址行政区划编码）
-EXPECTED_VERSIONS = ["1", "2", "3", "4", "5"]
+# 期望的迁移版本（V1 建表 / V2 索引 / V3 操作日志 / V4 评价 / V5 地址行政区划编码 /
+# V6 书单·浏览历史·Banner·到货提醒·运费规则）
+EXPECTED_VERSIONS = ["1", "2", "3", "4", "5", "6"]
+# 已有库接入 Flyway 时打的基线版本：手工脚本时代已应用到 V5，之后的版本才是 Flyway 真正执行的
 BASELINE_VERSION = "5"
 
 passed = []

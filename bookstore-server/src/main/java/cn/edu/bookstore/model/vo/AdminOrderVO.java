@@ -1,6 +1,5 @@
 package cn.edu.bookstore.model.vo;
 
-import cn.edu.bookstore.common.OrderStatus;
 import cn.edu.bookstore.entity.Orders;
 import cn.edu.bookstore.entity.User;
 import lombok.Data;
@@ -29,15 +28,9 @@ public class AdminOrderVO extends OrderVO {
         if (orders == null) {
             return null;
         }
-        AdminOrderVO vo = new AdminOrderVO();
-        vo.setId(orders.getId());
-        vo.setOrderNo(orders.getOrderNo());
-        vo.setTotalAmount(orders.getTotalAmount());
-        vo.setStatus(orders.getStatus());
-        vo.setStatusText(OrderStatus.textOf(orders.getStatus()));
-        vo.setAddressSnapshot(orders.getAddressSnapshot());
-        vo.setPayTime(orders.getPayTime());
-        vo.setCreateTime(orders.getCreateTime());
+        // 公共字段走 OrderVO.fillBase，管理端不再自己抄一遍字段赋值 ——
+        // 否则 OrderVO 新增字段时后台会静默漏掉（APP 端正常、后台空白）。
+        AdminOrderVO vo = OrderVO.fillBase(new AdminOrderVO(), orders);
         if (user != null) {
             vo.setUserId(user.getId());
             vo.setUserPhone(user.getPhone());

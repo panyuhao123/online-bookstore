@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -95,6 +96,9 @@ public class AdminOrderServiceImpl implements AdminOrderService {
         Orders update = new Orders();
         update.setId(id);
         update.setStatus(OrderStatus.SHIPPED.getCode());
+        // 发货时间必须与状态在同一次 UPDATE 里落库：拆成两次写会出现「状态已发货、时间为空」
+        // 的中间态，而这个中间态正好会把订单时间线渲染成一个空缺节点。
+        update.setShipTime(LocalDateTime.now());
         ordersMapper.updateById(update);
         log.info("管理端发货成功 orderId={} orderNo={}", id, orders.getOrderNo());
     }

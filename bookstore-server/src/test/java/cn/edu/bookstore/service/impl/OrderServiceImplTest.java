@@ -15,15 +15,19 @@ import cn.edu.bookstore.mapper.CartMapper;
 import cn.edu.bookstore.mapper.OrderItemMapper;
 import cn.edu.bookstore.mapper.OrdersMapper;
 import cn.edu.bookstore.model.dto.OrderCreateRequest;
+import cn.edu.bookstore.model.dto.OrderSettleRequest;
+import cn.edu.bookstore.model.vo.OrderSettleVO;
 import cn.edu.bookstore.model.vo.OrderVO;
 import cn.edu.bookstore.model.vo.PageVO;
 import cn.edu.bookstore.service.BookService;
+import cn.edu.bookstore.service.FreightService;
 import cn.edu.bookstore.support.MybatisPlusTestSupport;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -87,6 +91,14 @@ class OrderServiceImplTest {
     @Mock private AddressMapper addressMapper;
     @Mock private BookMapper bookMapper;
     @Mock private BookService bookService;
+
+    /**
+     * 运费规则的来源。默认桩成「包邮（0.00）」：
+     * 既有用例关注的是下单主流程（越权、超卖、快照、状态机），
+     * 不该因为「运营把包邮门槛调走了」而集体失败 —— 那是运费规则自己的用例该管的事。
+     */
+    @Mock private FreightService freightService;
+
     @Mock private ObjectProvider<CacheManager> cacheManagerProvider;
     @Mock private BusinessMetrics businessMetrics;
 
@@ -96,6 +108,11 @@ class OrderServiceImplTest {
     static void initMybatisPlusMetadata() {
         // 纯单测不起容器，lambda 条件构造器需要手工注册实体元数据（详见 MybatisPlusTestSupport）
         MybatisPlusTestSupport.initTableInfo(Address.class, Book.class, Cart.class, OrderItem.class, Orders.class);
+    }
+
+    @BeforeEach
+    void stubFreightAsFreeByDefault() {
+        when(freightService.freightOf(any())).thenReturn(BigDecimal.ZERO);
     }
 
     /** 去掉反引号与多余空白后再断言 SQL 片段，免得为「列名加不加引号」这种实现细节写死断言 */
@@ -269,6 +286,67 @@ class OrderServiceImplTest {
 
             assertEquals(3, vo.getTotalQuantity());
             assertEquals(2, vo.getItems().size());
+        }
+
+        @Test
+        @DisplayName("运费随订单落库，且应付 = 商品小计 + 运费（total_amount 语义仍为商品小计）")
+        void persistsFreightAmountAlongsideGoodsAmount() {
+            when(addressMapper.selectById(1L)).thenReturn(address(1L, USER_ID));
+            when(cartMapper.selectList(any())).thenReturn(List.of(cart(11L, 1L, 2, 1)));
+            when(bookService.mapByIds(anyList()))
+                    .thenReturn(Map.of(1L, book(1L, "算法导论", "25.50", 5, 1)));
+            stubOrderInsert();
+            when(bookMapper.update(isNull(), any())).thenReturn(1);
+            // 未达包邮门槛，应收 8 元运费
+            when(freightService.freightOf(any())).thenReturn(new BigDecimal("8.00"));
+
+            OrderVO vo = orderService.create(USER_ID, request(1L, List.of(11L)));
+
+            ArgumentCaptor<Orders> captor = ArgumentCaptor.forClass(Orders.class);
+            verify(ordersMapper).insert(captor.capture());
+            // 关键断言：total_amount 不能被改成「含运费」—— 存量订单该字段的语义是商品小计，
+            // 改写语义会让历史数据对不上账。运费单独存列，应付由应用层相加。
+            assertEquals(0, new BigDecimal("51.00").compareTo(captor.getValue().getTotalAmount()));
+            assertEquals(0, new BigDecimal("8.00").compareTo(captor.getValue().getFreightAmount()));
+
+            assertEquals(0, new BigDecimal("51.00").compareTo(vo.getTotalAmount()));
+            assertEquals(0, new BigDecimal("8.00").compareTo(vo.getFreightAmount()));
+            assertEquals(0, new BigDecimal("59.00").compareTo(vo.getPayableAmount()));
+        }
+
+        @Test
+        @DisplayName("运费按「商品小计」计算，入参必须是小计而不是明细条数或单价")
+        void computesFreightOnGoodsSubtotal() {
+            when(addressMapper.selectById(1L)).thenReturn(address(1L, USER_ID));
+            when(cartMapper.selectList(any())).thenReturn(List.of(cart(11L, 1L, 3, 1)));
+            when(bookService.mapByIds(anyList()))
+                    .thenReturn(Map.of(1L, book(1L, "书", "10.00", 9, 1)));
+            stubOrderInsert();
+            when(bookMapper.update(isNull(), any())).thenReturn(1);
+
+            orderService.create(USER_ID, request(1L, List.of(11L)));
+
+            ArgumentCaptor<BigDecimal> captor = ArgumentCaptor.forClass(BigDecimal.class);
+            verify(freightService).freightOf(captor.capture());
+            // 10.00 × 3 = 30.00，不是 3（件数）也不是 10.00（单价）
+            assertEquals(0, new BigDecimal("30.00").compareTo(captor.getValue()));
+        }
+
+        @Test
+        @DisplayName("明细已打到库存不足时不会计算运费，也就不会产生任何副作用")
+        void doesNotConsultFreightWhenStockInsufficient() {
+            when(addressMapper.selectById(1L)).thenReturn(address(1L, USER_ID));
+            when(cartMapper.selectList(any())).thenReturn(List.of(cart(11L, 1L, 99, 1)));
+            when(bookService.mapByIds(anyList()))
+                    .thenReturn(Map.of(1L, book(1L, "稀缺书", "10.00", 2, 1)));
+
+            assertThrows(BusinessException.class,
+                    () -> orderService.create(USER_ID, request(1L, List.of(11L))));
+
+            // 运费计算虽然不改数据，但让它跑在「一定会失败」的路径上毫无意义；
+            // 更重要的是把「校验在前、计算在后」这条顺序固定下来 ——
+            // 顺序反了就会出现「用非法金额算出的运费」这种幽灵数据。
+            verify(freightService, never()).freightOf(any());
         }
 
         @Test
@@ -703,6 +781,112 @@ class OrderServiceImplTest {
             verify(cache, times(2)).clear();
             verify(cacheManager).getCache("book");
             verify(cacheManager).getCache("hotBook");
+        }
+    }
+
+    // ============================================================== 结算预览
+
+    @Nested
+    @DisplayName("结算预览 settlePreview()")
+    class SettlePreview {
+
+        @Test
+        @DisplayName("按已勾选条目算商品小计与件数，并把金额计算委托给运费服务")
+        void sumsCheckedEntriesAndDelegatesToFreight() {
+            when(cartMapper.selectList(any()))
+                    .thenReturn(List.of(cart(11L, 1L, 2, 1), cart(12L, 2L, 1, 1)));
+            when(bookService.mapByIds(anyList())).thenReturn(Map.of(
+                    1L, book(1L, "深入理解计算机系统", "10.00", 5, 1),
+                    2L, book(2L, "算法导论", "25.50", 3, 1)));
+            when(freightService.settle(any(), org.mockito.ArgumentMatchers.anyInt()))
+                    .thenAnswer(inv -> {
+                        OrderSettleVO vo = new OrderSettleVO();
+                        vo.setGoodsAmount(inv.getArgument(0));
+                        vo.setTotalQuantity(inv.getArgument(1));
+                        return vo;
+                    });
+
+            OrderSettleVO vo = orderService.settlePreview(USER_ID, new OrderSettleRequest());
+
+            assertEquals(0, new BigDecimal("45.50").compareTo(vo.getGoodsAmount()));
+            assertEquals(3, vo.getTotalQuantity());
+            // 金额口径只能由 FreightService 决定：它是配置驱动的，前端与预览都不能自己算
+            verify(freightService).settle(any(), org.mockito.ArgumentMatchers.eq(3));
+        }
+
+        @Test
+        @DisplayName("传了 cartIds 时只算这些条目（与下单规则一致，否则部分勾选会算错金额）")
+        void usesProvidedCartIdsWhenPresent() {
+            when(cartMapper.selectList(any())).thenReturn(List.of(cart(12L, 2L, 1, 1)));
+            when(bookService.mapByIds(anyList()))
+                    .thenReturn(Map.of(2L, book(2L, "算法导论", "25.50", 3, 1)));
+            when(freightService.settle(any(), org.mockito.ArgumentMatchers.anyInt()))
+                    .thenReturn(new OrderSettleVO());
+
+            OrderSettleRequest request = new OrderSettleRequest();
+            request.setCartIds(List.of(12L));
+            orderService.settlePreview(USER_ID, request);
+
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<Wrapper<Cart>> captor = ArgumentCaptor.forClass(Wrapper.class);
+            verify(cartMapper).selectList(captor.capture());
+            String sql = normalize(captor.getValue().getSqlSegment());
+            assertTrue(sql.contains("id"), "未按 cartIds 过滤：" + sql);
+            assertTrue(sql.contains("user_id"), "未限定用户，存在越权结算风险：" + sql);
+        }
+
+        @Test
+        @DisplayName("购物车为空 → 返回 0 金额而不是抛异常（结算页空态是正常状态）")
+        void returnsZeroForEmptyCart() {
+            when(cartMapper.selectList(any())).thenReturn(List.of());
+            when(freightService.settle(any(), org.mockito.ArgumentMatchers.anyInt()))
+                    .thenReturn(new OrderSettleVO());
+
+            orderService.settlePreview(USER_ID, new OrderSettleRequest());
+
+            verify(freightService).settle(any(), org.mockito.ArgumentMatchers.eq(0));
+            // 预览是只读操作：不写订单、不动库存、不清购物车
+            verify(ordersMapper, never()).insert(any(Orders.class));
+            verify(bookMapper, never()).update(isNull(), any());
+            verify(cartMapper, never()).deleteBatchIds(any());
+        }
+
+        @Test
+        @DisplayName("入参为 null 时按「全部已勾选」处理（前端首屏可能还没带上请求体）")
+        void toleratesNullRequest() {
+            when(cartMapper.selectList(any())).thenReturn(List.of());
+            when(freightService.settle(any(), org.mockito.ArgumentMatchers.anyInt()))
+                    .thenReturn(new OrderSettleVO());
+
+            orderService.settlePreview(USER_ID, null);
+
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<Wrapper<Cart>> captor = ArgumentCaptor.forClass(Wrapper.class);
+            verify(cartMapper).selectList(captor.capture());
+            String sql = normalize(captor.getValue().getSqlSegment());
+            assertTrue(sql.contains("checked"), "未回落到勾选筛选：" + sql);
+        }
+
+        @Test
+        @DisplayName("购物车里有已删除的图书 → 跳过该条而不是整页报错")
+        void skipsDanglingBookRows() {
+            when(cartMapper.selectList(any()))
+                    .thenReturn(List.of(cart(11L, 1L, 1, 1), cart(12L, 2L, 1, 1)));
+            // 书 2 已不存在（脏数据）
+            when(bookService.mapByIds(anyList()))
+                    .thenReturn(Map.of(1L, book(1L, "书", "10.00", 5, 1)));
+            when(freightService.settle(any(), org.mockito.ArgumentMatchers.anyInt()))
+                    .thenAnswer(inv -> {
+                        OrderSettleVO vo = new OrderSettleVO();
+                        vo.setGoodsAmount(inv.getArgument(0));
+                        vo.setTotalQuantity(inv.getArgument(1));
+                        return vo;
+                    });
+
+            OrderSettleVO vo = orderService.settlePreview(USER_ID, new OrderSettleRequest());
+
+            assertEquals(0, new BigDecimal("10.00").compareTo(vo.getGoodsAmount()));
+            assertEquals(1, vo.getTotalQuantity());
         }
     }
 }

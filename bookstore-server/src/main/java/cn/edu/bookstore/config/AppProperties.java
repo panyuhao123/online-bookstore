@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -65,6 +66,15 @@ public class AppProperties {
 
     /** 订单相关配置 */
     private Order order = new Order();
+
+    /**
+     * 运费规则的兜底默认值。
+     *
+     * <p>运行期真正生效的规则来自 sys_config 表（管理端可改），这里只在
+     * 「配置表读不到对应键」时兜底。保留这一层是因为配置表可能被人误清空，
+     * 而运费是下单流程的必经环节 —— 兜底能让下单不至于因为一次误操作彻底不可用。
+     */
+    private Freight freight = new Freight();
 
     /** 支付相关配置 */
     private Pay pay = new Pay();
@@ -352,6 +362,36 @@ public class AppProperties {
     }
 
     /**
+     * 运费规则的兜底默认值（仅当 sys_config 表中读不到对应键时生效）。
+     *
+     * <p>三项与配置表中的键一一对应：
+     * {@code freight.enabled} / {@code freight.free-threshold} / {@code freight.base-fee}。
+     */
+    @Data
+    public static class Freight {
+
+        /**
+         * 是否收取运费。
+         *
+         * <p>false 表示全场包邮。做成开关而不是「把运费设成 0」，
+         * 是为了让「大促期间全场包邮、活动结束恢复」可以一键来回切，
+         * 而不必记住原来的运费金额是多少。
+         */
+        private boolean enabled = true;
+
+        /**
+         * 包邮门槛（元）。达到或超过该金额免运费。
+         *
+         * <p>默认 99 元是国内电商最常见的档位：既能推动凑单，
+         * 又不至于让「买一本书」这类小额订单全部免运费。
+         */
+        private BigDecimal freeThreshold = new BigDecimal("99");
+
+        /** 未达门槛时的运费（元） */
+        private BigDecimal baseFee = new BigDecimal("8.00");
+    }
+
+    /**
      * 支付配置。
      *
      * <p>设计思路与「文件存储」一致：把「用哪种支付渠道」抽成配置项，
@@ -439,6 +479,17 @@ public class AppProperties {
             throw new IllegalStateException(
                     "配置校验失败：bookstore.order.auto-cancel-batch-size 需在 1~5000 之间");
         }
+        // 运费兜底值：金额为负等于给用户倒贴钱，必须挡住；
+        // enabled=true 但没有门槛也没有基础运费，等于「收 0 元运费」，同样是配置写错，
+        // 与其静默按包邮处理，不如在启动期就说清楚。
+        if (freight.getFreeThreshold() == null || freight.getFreeThreshold().signum() < 0) {
+            throw new IllegalStateException(
+                    "配置校验失败：bookstore.freight.free-threshold 不能为负数");
+        }
+        if (freight.getBaseFee() == null || freight.getBaseFee().signum() < 0) {
+            throw new IllegalStateException(
+                    "配置校验失败：bookstore.freight.base-fee 不能为负数");
+        }
         if (!List.of("mock", "alipay").contains(pay.getType())) {
             throw new IllegalStateException(
                     "配置校验失败：bookstore.pay.type 只能是 mock 或 alipay，当前为 " + pay.getType());
@@ -491,12 +542,13 @@ public class AppProperties {
         log.info("配置加载完成：jwtExpireHours={}, tokenRevocationEnabled={}, uploadBaseDir={}, storageType={}, "
                         + "allowedOrigins={}, orderTimeoutMinutes={}, autoCancelEnabled={}, payType={}, "
                         + "gaodeEnabled={}, docsEnabled={}, loginGuardEnabled={}, maxFailures={}, lockMinutes={}, "
-                        + "metricsEnabled={}",
+                        + "metricsEnabled={}, freightEnabled={}, freightFreeThreshold={}, freightBaseFee={}",
                 jwt.getExpireHours(), jwt.getRevocation().isEnabled(), upload.getBaseDir(), storage.getType(),
                 cors.getAllowedOrigins(), order.getTimeoutMinutes(), order.isAutoCancelEnabled(), pay.getType(),
                 gaodeEnabled, docs.isEnabled(), loginGuard.isEnabled(),
                 loginGuard.getMaxFailures(), loginGuard.getLockMinutes(),
-                observability.isMetricsEnabled());
+                observability.isMetricsEnabled(),
+                freight.isEnabled(), freight.getFreeThreshold(), freight.getBaseFee());
     }
 
     /**

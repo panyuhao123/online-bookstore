@@ -4,9 +4,13 @@ import cn.edu.bookstore.common.BusinessException;
 import cn.edu.bookstore.common.Result;
 import cn.edu.bookstore.common.web.LoginUserHolder;
 import cn.edu.bookstore.model.dto.OrderCreateRequest;
+import cn.edu.bookstore.model.dto.OrderSettleRequest;
+import cn.edu.bookstore.model.vo.FreightRuleVO;
+import cn.edu.bookstore.model.vo.OrderSettleVO;
 import cn.edu.bookstore.model.vo.OrderVO;
 import cn.edu.bookstore.model.vo.PageVO;
 import cn.edu.bookstore.model.vo.PrepayVO;
+import cn.edu.bookstore.service.FreightService;
 import cn.edu.bookstore.service.OrderService;
 import cn.edu.bookstore.service.PayService;
 import jakarta.servlet.http.HttpServletResponse;
@@ -37,6 +41,34 @@ public class OrderController {
 
     private final OrderService orderService;
     private final PayService payService;
+    private final FreightService freightService;
+
+    /**
+     * 运费规则（匿名可访问）。
+     *
+     * <p>放在订单前缀下是因为它服务于结算流程，但它的读权限与图书详情同级：
+     * 商品详情页要在「加入购物车」按钮旁渲染「再买 ¥X 包邮」，
+     * 那一刻用户还没有登录，接口若要求令牌，这句引导文案就只能写死在前端，
+     * 而写死的门槛一旦和后台配置不一致，就会出现「页面说满 99 包邮、结算时却收运费」。
+     */
+    @GetMapping("/freight-rule")
+    public Result<FreightRuleVO> freightRule() {
+        return Result.success(freightService.currentRule());
+    }
+
+    /**
+     * 结算金额预览（需要登录）。
+     *
+     * <p>与 {@code /create} 的区别是<b>只算不落库</b>：不校验地址、不扣库存、不写订单。
+     * 结算页在用户选地址之前就要显示金额，因此不能用 create 的结果来预览 ——
+     * 那需要先造一个地址，且每次改数量都会产生一笔真实订单。
+     *
+     * <p>金额一律由服务端算：运费规则是可配置的，前后端各算一遍迟早不一致。
+     */
+    @PostMapping("/settle-preview")
+    public Result<OrderSettleVO> settlePreview(@RequestBody(required = false) OrderSettleRequest request) {
+        return Result.success(orderService.settlePreview(LoginUserHolder.getUserId(), request));
+    }
 
     /** 提交订单（模拟下单） */
     @PostMapping("/create")

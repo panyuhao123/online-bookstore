@@ -1,6 +1,8 @@
 package cn.edu.bookstore.service;
 
 import cn.edu.bookstore.model.dto.OrderCreateRequest;
+import cn.edu.bookstore.model.dto.OrderSettleRequest;
+import cn.edu.bookstore.model.vo.OrderSettleVO;
 import cn.edu.bookstore.model.vo.OrderVO;
 import cn.edu.bookstore.model.vo.PageVO;
 
@@ -10,6 +12,19 @@ import cn.edu.bookstore.model.vo.PageVO;
  * @author 毕设项目组
  */
 public interface OrderService {
+
+    /**
+     * 结算金额预览：按购物车条目算出商品小计、运费与应付合计，<b>不写任何数据</b>。
+     *
+     * <p>存在的理由：运费规则（是否包邮、门槛多少）是服务端配置。若前端拿商品小计自己判断，
+     * 运营改了门槛之后，结算页显示的应付金额就会与提交后订单上的金额不一致 ——
+     * 用户看到 107 元、订单却是 115 元，这是最难解释的一类投诉。
+     * 把金额计算收敛到服务端，前端只负责展示，「预览与下单不一致」在结构上就不可能发生。
+     *
+     * @param userId  当前登录用户
+     * @param request 参与结算的购物车条目；为空表示取所有已勾选条目
+     */
+    OrderSettleVO settlePreview(Long userId, OrderSettleRequest request);
 
     /**
      * 提交订单（模拟下单）：校验购物车 → 生成订单与明细 → 扣减库存 → 清空已下单的购物车条目。

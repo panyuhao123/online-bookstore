@@ -15,10 +15,13 @@ import cn.edu.bookstore.mapper.CartMapper;
 import cn.edu.bookstore.mapper.OrderItemMapper;
 import cn.edu.bookstore.mapper.OrdersMapper;
 import cn.edu.bookstore.model.dto.OrderCreateRequest;
+import cn.edu.bookstore.model.dto.OrderSettleRequest;
 import cn.edu.bookstore.model.vo.OrderItemVO;
+import cn.edu.bookstore.model.vo.OrderSettleVO;
 import cn.edu.bookstore.model.vo.OrderVO;
 import cn.edu.bookstore.model.vo.PageVO;
 import cn.edu.bookstore.service.BookService;
+import cn.edu.bookstore.service.FreightService;
 import cn.edu.bookstore.service.OrderService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -81,6 +84,12 @@ public class OrderServiceImpl implements OrderService {
     private final AddressMapper addressMapper;
     private final BookMapper bookMapper;
     private final BookService bookService;
+
+    /**
+     * 运费规则来源。与结算预览共用同一个实现，保证「预览算出来的应付」
+     * 与「下单真正落库的应付」出自同一段逻辑，不会因两边各写一份而漂移。
+     */
+    private final FreightService freightService;
 
     /**
      * 用 ObjectProvider 而不是直接注入 CacheManager：
@@ -151,22 +160,28 @@ public class OrderServiceImpl implements OrderService {
             totalAmount = totalAmount.add(subtotal);
         }
 
-        // 4. 订单主表
+        // 4. 运费：与结算预览走同一段逻辑。
+        // 注意 total_amount 存的是「商品小计」，不含运费；应付 = total_amount + freight_amount。
+        // 存量订单的 freight_amount 默认为 0，语义上正好是「当时包邮」，无需数据迁移。
+        BigDecimal freightAmount = freightService.freightOf(totalAmount);
+
+        // 5. 订单主表
         Orders orders = new Orders();
         orders.setOrderNo(generateOrderNo());
         orders.setUserId(userId);
         orders.setTotalAmount(totalAmount);
+        orders.setFreightAmount(freightAmount);
         orders.setStatus(OrderStatus.PENDING_PAY.getCode());
         orders.setAddressSnapshot(buildAddressSnapshot(address));
         ordersMapper.insert(orders);
 
-        // 5. 订单明细
+        // 6. 订单明细
         for (OrderItem item : orderItems) {
             item.setOrderId(orders.getId());
             orderItemMapper.insert(item);
         }
 
-        // 6. 扣减库存（条件更新防超卖）
+        // 7. 扣减库存（条件更新防超卖）
         for (OrderItem item : orderItems) {
             int rows = bookMapper.update(null, new LambdaUpdateWrapper<Book>()
                     .setSql("stock = stock - " + item.getQuantity()
@@ -180,11 +195,12 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // 7. 清空已下单的购物车条目
+        // 8. 清空已下单的购物车条目
         cartMapper.deleteBatchIds(carts.stream().map(Cart::getId).toList());
 
-        log.info("下单成功 userId={} orderNo={} 金额={} 明细数={}",
-                userId, orders.getOrderNo(), totalAmount, orderItems.size());
+        log.info("下单成功 userId={} orderNo={} 商品小计={} 运费={} 应付={} 明细数={}",
+                userId, orders.getOrderNo(), totalAmount, freightAmount,
+                totalAmount.add(freightAmount), orderItems.size());
         // 埋点放在最后一步：走到这里订单、明细、库存、购物车都已处理完毕，
         // 计数才与「真正成功的订单」对得上（中途库存不足等异常会抛在上面，不会计数）。
         businessMetrics.orderCreated();
@@ -193,6 +209,46 @@ public class OrderServiceImpl implements OrderService {
         vo.setItems(orderItems.stream().map(OrderItemVO::from).toList());
         vo.setTotalQuantity(orderItems.stream().mapToInt(OrderItem::getQuantity).sum());
         return vo;
+    }
+
+    @Override
+    public OrderSettleVO settlePreview(Long userId, OrderSettleRequest request) {
+        // 「取哪些购物车条目」的规则必须与 create 完全一致（传了 cartIds 就只算这些，
+        // 否则算所有已勾选的），否则预览金额与下单金额会在「部分勾选」的场景下不一致 ——
+        // 而部分勾选恰恰是结算页最常见的使用方式。
+        List<Long> cartIds = request == null ? null : request.getCartIds();
+        LambdaQueryWrapper<Cart> cartWrapper = new LambdaQueryWrapper<Cart>().eq(Cart::getUserId, userId);
+        if (cartIds != null && !cartIds.isEmpty()) {
+            cartWrapper.in(Cart::getId, cartIds);
+        } else {
+            cartWrapper.eq(Cart::getChecked, 1);
+        }
+        List<Cart> carts = cartMapper.selectList(cartWrapper);
+
+        // 购物车为空不是错误：结算页刚进去、或用户取消了全部勾选，都属于正常状态。
+        // 这里返回一个「0 商品 + 按规则算出的运费」，让前端能原样渲染空态，
+        // 而不是抛异常让页面弹一个红色的错误提示。
+        if (carts == null || carts.isEmpty()) {
+            return freightService.settle(BigDecimal.ZERO, 0);
+        }
+
+        Map<Long, Book> bookMap = bookService.mapByIds(
+                carts.stream().map(Cart::getBookId).distinct().toList());
+
+        BigDecimal goodsAmount = BigDecimal.ZERO;
+        int totalQuantity = 0;
+        for (Cart cart : carts) {
+            Book book = bookMap.get(cart.getBookId());
+            if (book == null) {
+                // 图书已被删除（购物车条目本应由外键约束清掉，这里只是兜底防御）：
+                // 跳过而不是中止，预览是「看一眼要花多少钱」，不该因为一条脏数据整页报错。
+                log.warn("结算预览遇到已不存在的图书 cartId={} bookId={}", cart.getId(), cart.getBookId());
+                continue;
+            }
+            goodsAmount = goodsAmount.add(book.getPrice().multiply(BigDecimal.valueOf(cart.getQuantity())));
+            totalQuantity += cart.getQuantity();
+        }
+        return freightService.settle(goodsAmount, totalQuantity);
     }
 
     @Override
@@ -247,6 +303,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         orders.setStatus(OrderStatus.COMPLETED.getCode());
+        orders.setFinishTime(LocalDateTime.now());
         ordersMapper.updateById(orders);
         log.info("确认收货成功 userId={} orderNo={}", userId, orders.getOrderNo());
     }

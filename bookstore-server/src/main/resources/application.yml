@@ -179,6 +179,17 @@ bookstore:
     auto-cancel-cron: "${ORDER_AUTO_CANCEL_CRON:0 */5 * * * ?}"
     # 单次最多处理订单数，给批量操作封顶，避免积压过多时开一个超长事务
     auto-cancel-batch-size: ${ORDER_AUTO_CANCEL_BATCH_SIZE:200}
+  freight:
+    # ⚠ 这里只是「兜底默认值」——运行期真正生效的运费规则存在 sys_config 表里，
+    #   由管理端「运费规则」页面随时修改（改完立即生效，不需要重启）。
+    #   之所以还保留这一层，是因为配置表可能被人误清空（例如执行了删除数据的脚本），
+    #   而运费是下单流程的必经环节，兜底能让下单不至于因为一次误操作彻底不可用。
+    #   三项与配置表的键一一对应：freight.enabled / freight.free-threshold / freight.base-fee
+    enabled: ${FREIGHT_ENABLED:true}
+    # 包邮门槛（元）：达到或超过该金额免运费
+    free-threshold: ${FREIGHT_FREE_THRESHOLD:99}
+    # 未达门槛时的运费（元）
+    base-fee: ${FREIGHT_BASE_FEE:8.00}
   pay:
     # 支付渠道：mock-模拟支付（默认，零外部依赖，答辩演示最稳）/ alipay-支付宝沙箱
     type: ${PAY_TYPE:mock}

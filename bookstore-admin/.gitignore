@@ -2,3 +2,5 @@ node_modules/
 dist/
 *.local
 .DS_Store
+# vitest 运行期临时目录（沙箱规避：TEMP/TMP 指向此目录，见 vitest.config.js 注释）
+.tmp/

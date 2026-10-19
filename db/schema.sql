@@ -1,15 +1,32 @@
 -- =====================================================================
--- 线上书店 APP —— MySQL 8.0 数据库建表脚本
--- 字符集：utf8mb4（支持 emoji 与生僻字）；排序规则：utf8mb4_general_ci
+-- 线上书店 APP —— MySQL 8.0 数据库结构快照（完整版）
+--
+-- 【本文件的定位】
+--   这是一份「最终结构」的可读快照，便于人工查阅、写论文和手工比对。
+--   ⚠ 结构变更的**唯一权威来源**是后端工程内的迁移脚本：
+--       bookstore-server/src/main/resources/db/migration/V*.sql
+--   服务启动时由 Flyway 自动执行缺失的版本，**不需要**再手工跑本文件。
+--   改了迁移脚本后请同步本文件，并用 tools/verify_flyway_migration.py 校验两者一致。
+--
+-- 【版本对应关系】
+--   V1__init_schema.sql          本文件第 1~8 节（基础 8 张表）
+--   V2__book_filter_indexes.sql  book 表的 idx_book_status_cate_price / idx_book_sales
+--   V3__operation_log.sql        本文件第 9 节
+--   V4__book_review.sql          本文件第 10 节
+--   V5__address_adcode_columns.sql  address 表的 province_adcode / city_adcode / district_adcode
+--   历史手工脚本已归档至 db/legacy/
+--
+-- 【手工建库（可选，正常不需要）】
+--   推荐做法：只要执行
+--     CREATE DATABASE IF NOT EXISTS bookstore DEFAULT CHARSET utf8mb4 COLLATE utf8mb4_general_ci;
+--   然后启动后端服务，Flyway 会自动建好全部表。
+--   若确实要手工执行本文件，请把上文四段迁移的效果一并理解后再执行，避免漏表。
+--
 -- 设计约定：
 --   1) 全部使用「业务外键」，不建数据库物理外键，避免级联锁与迁移困难；
 --   2) 金额统一 DECIMAL(10,2)，不用 FLOAT/DOUBLE，避免精度丢失；
 --   3) 删除一律「逻辑删除」，表内保留 create_time / update_time 审计字段；
 --   4) 订单保存收货地址快照，避免用户改地址后历史订单信息被污染。
--- 执行方式（在 MySQL 客户端中）：
---   CREATE DATABASE IF NOT EXISTS bookstore DEFAULT CHARSET utf8mb4 COLLATE utf8mb4_general_ci;
---   USE bookstore;
---   SOURCE db/schema.sql;
 -- =====================================================================
 
 SET NAMES utf8mb4;
@@ -129,6 +146,10 @@ CREATE TABLE `address` (
     `is_default`  TINYINT     NOT NULL DEFAULT 0      COMMENT '是否默认地址：1-默认 0-普通',
     `create_time` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    -- 行政区划编码（对应迁移 V5）：保存省/市/区的 adcode，供高德地理编码使用
+    `province_adcode` VARCHAR(12) DEFAULT NULL        COMMENT '省份 adcode 编码',
+    `city_adcode`     VARCHAR(12) DEFAULT NULL        COMMENT '城市 adcode 编码',
+    `district_adcode` VARCHAR(12) DEFAULT NULL        COMMENT '区县 adcode 编码',
     PRIMARY KEY (`id`),
     KEY `idx_address_user` (`user_id`),
     KEY `idx_address_default` (`user_id`, `is_default`)
@@ -173,5 +194,55 @@ CREATE TABLE `order_item` (
     KEY `idx_order_item_order` (`order_id`),
     KEY `idx_order_item_book` (`book_id`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '订单明细表';
+
+-- ---------------------------------------------------------------------
+-- 9. 管理端操作日志表 operation_log（对应迁移 V3）
+--    配合 AOP 切面把管理端写操作结构化落库：谁、什么时候、对哪个模块做了什么、成功与否
+-- ---------------------------------------------------------------------
+DROP TABLE IF EXISTS `operation_log`;
+CREATE TABLE `operation_log`
+(
+    `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `admin_id`    BIGINT       DEFAULT NULL COMMENT '操作管理员ID（业务外键 -> admin.id，不可变标识）',
+    `admin_name`  VARCHAR(64)  DEFAULT NULL COMMENT '操作人名称快照（管理员真实姓名；名称可能被修改，故同时保留 admin_id）',
+    `module`      VARCHAR(64)  DEFAULT NULL COMMENT '业务模块，如「图书管理」',
+    `action`      VARCHAR(64)  DEFAULT NULL COMMENT '操作动作，如「新增图书」',
+    `http_method` VARCHAR(10)  DEFAULT NULL COMMENT 'HTTP 方法',
+    `uri`         VARCHAR(255) DEFAULT NULL COMMENT '请求路径',
+    `params`      VARCHAR(2000) DEFAULT NULL COMMENT '请求参数（敏感字段已脱敏，超长截断）',
+    `ip`          VARCHAR(64)  DEFAULT NULL COMMENT '客户端 IP',
+    `duration_ms` BIGINT       DEFAULT NULL COMMENT '耗时（毫秒）',
+    `success`     TINYINT      NOT NULL DEFAULT 1 COMMENT '是否成功：1-成功 0-失败',
+    `error_msg`   VARCHAR(500) DEFAULT NULL COMMENT '失败原因（仅失败时记录）',
+    `create_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_oplog_create_time` (`create_time`),
+    KEY `idx_oplog_module` (`module`),
+    KEY `idx_oplog_admin` (`admin_id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '管理端操作日志';
+
+-- ---------------------------------------------------------------------
+-- 10. 图书评价表 review（对应迁移 V4）
+--     唯一键 (user_id, book_id, order_id) 保证「同一订单同一本书只评一次」，
+--     并用 order_id 把评价与真实购买绑定，从数据层面排除刷评
+-- ---------------------------------------------------------------------
+DROP TABLE IF EXISTS `review`;
+CREATE TABLE `review`
+(
+    `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `book_id`     BIGINT       NOT NULL COMMENT '图书ID（业务外键 -> book.id）',
+    `user_id`     BIGINT       NOT NULL COMMENT '评价用户ID（业务外键 -> user.id）',
+    `order_id`    BIGINT       NOT NULL COMMENT '来源订单ID，保证「只有买过才能评」',
+    `rating`      TINYINT      NOT NULL COMMENT '星级评分 1~5',
+    `content`     VARCHAR(500) DEFAULT NULL COMMENT '评价内容',
+    `anonymous`   TINYINT      NOT NULL DEFAULT 0 COMMENT '是否匿名：1-匿名 0-显示昵称',
+    `status`      TINYINT      NOT NULL DEFAULT 1 COMMENT '状态：1-正常 0-已隐藏（后台下架违规评价）',
+    `create_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '评价时间',
+    `update_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_review_user_book_order` (`user_id`, `book_id`, `order_id`),
+    KEY `idx_review_book_status_time` (`book_id`, `status`, `create_time`),
+    KEY `idx_review_user` (`user_id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '图书评价';
 
 SET FOREIGN_KEY_CHECKS = 1;

@@ -20,7 +20,9 @@ onMounted(async () => {
 })
 
 function goCategory(id) {
-  router.push({ path: '/books', query: { categoryId: id } })
+  // 分类浏览走「商品目录」：那页把分类平铺成页签、带书目数，切类不用回侧栏；
+  // 「图书列表」留给带关键词的检索场景
+  router.push({ path: '/catalog', query: { categoryId: id } })
 }
 
 async function onPopoverShow(cat) {
@@ -47,6 +49,11 @@ async function onPopoverShow(cat) {
     <template v-if="!appStore.sidebarCollapsed">
       <div class="sidebar-title">图书分类</div>
       <ul class="category-list">
+        <!-- 全部图书 → 商品目录（S6）：侧栏只能按单个分类点，需要一个"不挑分类"的入口 -->
+        <li class="category-item all-item" @click="router.push('/catalog')">
+          <span>全部图书</span>
+          <el-icon class="arrow"><ArrowRight /></el-icon>
+        </li>
         <el-popover
           v-for="cat in categories"
           :key="cat.id"
@@ -94,6 +101,13 @@ async function onPopoverShow(cat) {
     <!-- 折叠态：只显示图标首字 -->
     <template v-else>
       <ul class="category-list collapsed">
+        <li
+          class="category-item collapsed"
+          title="全部图书"
+          @click="router.push('/catalog')"
+        >
+          全
+        </li>
         <li
           v-for="cat in categories"
           :key="cat.id"

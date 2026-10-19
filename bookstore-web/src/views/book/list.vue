@@ -4,18 +4,15 @@ import { useRoute, useRouter } from 'vue-router'
 import { pageBooks } from '@/api/book'
 import BookCard from '@/components/BookCard.vue'
 import CompareBar from '@/components/CompareBar.vue'
-import { useUserStore } from '@/stores/user'
-import { useBooklistStore } from '@/stores/booklist'
 import { useCompareStore } from '@/stores/compare'
 import { addBatchToCartGuarded, addToCartGuarded } from '@/utils/cart-action'
+import { saveBooksToNewBooklist } from '@/utils/booklist-action'
 import { bookCover, placeholderCover } from '@/utils/image'
 import { formatPrice, formatRating } from '@/utils/format'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 
 const route = useRoute()
 const router = useRouter()
-const userStore = useUserStore()
-const booklistStore = useBooklistStore()
 const compareStore = useCompareStore()
 
 /** 后端 BookQuery.ALLOWED_SORTS 白名单；传其它值后端会静默回落成 default */
@@ -119,25 +116,8 @@ async function batchAddToBooklist() {
     ElMessage.warning('请先选择图书')
     return
   }
-  if (!userStore.isLogin) {
-    ElMessage.warning('请先登录')
-    router.push('/login')
-    return
-  }
-  try {
-    const { value: name } = await ElMessageBox.prompt('请输入书单名称', '保存为书单', {
-      confirmButtonText: '保存',
-      cancelButtonText: '取消',
-      inputPattern: /^\S+$/,
-      inputErrorMessage: '书单名称不能为空'
-    })
-    const list = booklistStore.createBooklist(name)
-    booklistStore.addBooksToList(list.id, selectedBooks.value)
-    ElMessage.success(`已保存 ${selectedBooks.value.length} 本书到书单「${name}」`)
-    router.push('/booklists/' + list.id)
-  } catch (e) {
-    /* 取消 */
-  }
+  const created = await saveBooksToNewBooklist(selectedBooks.value, { router })
+  if (created) router.push('/booklists/' + created.id)
 }
 
 function addToCompare(book) {

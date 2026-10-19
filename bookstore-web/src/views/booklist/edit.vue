@@ -13,10 +13,13 @@ const router = useRouter()
 const booklistStore = useBooklistStore()
 
 const isEdit = computed(() => !!route.params.id)
-const booklist = ref(null)
+const loading = ref(false)
+const saving = ref(false)
+
 const form = reactive({
   name: '',
-  description: ''
+  description: '',
+  isPublic: 0
 })
 
 // 可选图书池
@@ -25,9 +28,12 @@ const poolLoading = ref(false)
 const poolPage = ref(1)
 const poolKeyword = ref('')
 const poolTotal = ref(0)
+const POOL_SIZE = 12
 
 // 已选图书
 const selectedBooks = ref([])
+/** 编辑态下「打开页面时书单里已有的书」——保存时据此算增量 */
+const originalBookIds = ref([])
 
 // 拖拽
 const dragIndex = ref(-1)
@@ -36,9 +42,9 @@ async function loadPool() {
   poolLoading.value = true
   try {
     const res = await pageBooks({
-      keyword: poolKeyword.value,
+      keyword: poolKeyword.value || undefined,
       pageNum: poolPage.value,
-      pageSize: 12
+      pageSize: POOL_SIZE
     })
     poolBooks.value = res.list || []
     poolTotal.value = res.total || 0
@@ -47,9 +53,41 @@ async function loadPool() {
   }
 }
 
+function searchPool() {
+  poolPage.value = 1
+  loadPool()
+}
+
+async function loadExisting() {
+  loading.value = true
+  try {
+    const detail = await booklistStore.fetchDetail(route.params.id)
+    if (!detail?.mine) {
+      ElMessage.error('只能编辑自己创建的书单')
+      router.replace('/booklists/' + route.params.id)
+      return
+    }
+    form.name = detail.name || ''
+    form.description = detail.description || ''
+    // 必须回填公开状态：后端 BookListRequest 的 isPublic 默认值是 1，
+    // 不传就会把用户设的「仅自己可见」改成公开 —— 一次静默的设置篡改。
+    form.isPublic = detail.isPublic ?? 0
+    selectedBooks.value = [...(detail.books || [])]
+    originalBookIds.value = selectedBooks.value.map((b) => b.id)
+  } catch (e) {
+    ElMessage.error('书单加载失败')
+  } finally {
+    loading.value = false
+  }
+}
+
 function addBook(book) {
   if (selectedBooks.value.some((b) => b.id === book.id)) {
     ElMessage.info('已在书单中')
+    return
+  }
+  if (selectedBooks.value.length >= 200) {
+    ElMessage.warning('单个书单最多 200 本图书')
     return
   }
   selectedBooks.value.push({ ...book })
@@ -70,24 +108,60 @@ function onDrop(targetIdx) {
   dragIndex.value = -1
 }
 
-function save() {
+/**
+ * 保存。
+ *
+ * <p>编辑态**不算「全删全加」**：只提交真正变化的条目（新增的 addBooks、移出的 removeBook）。
+ * 全删全加看起来更"简单可靠"，实际会把用户没动过的书也写一遍，书单条目顺序被打乱，
+ * 而且一次网络抖动就可能只删没加完 —— 用户看到的是"我什么都没改，书少了半本"。
+ */
+async function save() {
   if (!form.name.trim()) {
     ElMessage.warning('请输入书单名称')
     return
   }
-  if (isEdit.value) {
-    booklistStore.updateBooklist(route.params.id, {
-      name: form.name,
-      description: form.description,
-      books: selectedBooks.value
-    })
-    ElMessage.success('书单已更新')
-  } else {
-    const list = booklistStore.createBooklist(form.name, form.description)
-    booklistStore.addBooksToList(list.id, selectedBooks.value)
-    ElMessage.success('书单已创建')
+  saving.value = true
+  try {
+    if (isEdit.value) {
+      await booklistStore.update(route.params.id, {
+        name: form.name.trim(),
+        description: form.description || '',
+        isPublic: form.isPublic
+      })
+
+      const currentIds = selectedBooks.value.map((b) => b.id)
+      const removed = originalBookIds.value.filter((id) => !currentIds.includes(id))
+      const added = currentIds.filter((id) => !originalBookIds.value.includes(id))
+
+      // 先删后加：避免中途短暂超出书单容量上限
+      for (const bookId of removed) {
+        await booklistStore.removeBook(route.params.id, bookId)
+      }
+      if (added.length > 0) {
+        await booklistStore.addBooks(route.params.id, added)
+      }
+      ElMessage.success('书单已更新')
+      router.push('/booklists/' + route.params.id)
+    } else {
+      const created = await booklistStore.create({
+        name: form.name.trim(),
+        description: form.description || '',
+        isPublic: form.isPublic
+      })
+      if (selectedBooks.value.length > 0) {
+        await booklistStore.addBooks(
+          created.id,
+          selectedBooks.value.map((b) => b.id)
+        )
+      }
+      ElMessage.success('书单已创建')
+      router.push('/booklists/' + created.id)
+    }
+  } catch (e) {
+    /* 拦截器已提示 */
+  } finally {
+    saving.value = false
   }
-  router.push('/booklists')
 }
 
 function exportList() {
@@ -104,29 +178,38 @@ function exportList() {
   exportToExcel(selectedBooks.value, columns, '书单_' + (form.name || '未命名'))
 }
 
-onMounted(() => {
-  if (isEdit.value) {
-    booklist.value = booklistStore.getBooklist(route.params.id)
-    if (booklist.value) {
-      form.name = booklist.value.name
-      form.description = booklist.value.description || ''
-      selectedBooks.value = [...booklist.value.books]
-    }
-  }
-  loadPool()
+onMounted(async () => {
+  if (isEdit.value) await loadExisting()
+  await loadPool()
 })
 </script>
 
 <template>
-  <div class="page-container booklist-edit">
+  <div class="page-container booklist-edit" v-loading="loading">
     <div class="edit-header card">
       <h2>{{ isEdit ? '编辑书单' : '新建书单' }}</h2>
       <div class="meta-form">
-        <el-input v-model="form.name" placeholder="书单名称" style="width: 300px" size="large" />
-        <el-input v-model="form.description" placeholder="书单描述（可选）" style="width: 400px" size="large" />
-        <el-button type="primary" size="large" @click="save">保存书单</el-button>
+        <el-input v-model="form.name" placeholder="书单名称（必填）" style="width: 260px" size="large" maxlength="50" />
+        <el-input
+          v-model="form.description"
+          placeholder="书单描述（可选）"
+          style="width: 360px"
+          size="large"
+          maxlength="200"
+        />
+        <el-switch
+          v-model="form.isPublic"
+          :active-value="1"
+          :inactive-value="0"
+          active-text="公开到书单广场"
+          inline-prompt
+        />
+        <el-button type="primary" size="large" :loading="saving" @click="save">保存书单</el-button>
         <el-button size="large" @click="exportList">导出 Excel</el-button>
       </div>
+      <p class="form-tip">
+        不公开的书单只有你自己能看到；公开后会出现在书单广场，其他书友也能浏览和收藏。
+      </p>
     </div>
 
     <div class="edit-body">
@@ -134,7 +217,15 @@ onMounted(() => {
       <div class="pool-panel card">
         <div class="panel-header">
           <h3>可选图书</h3>
-          <el-input v-model="poolKeyword" placeholder="搜索图书" size="small" style="width: 200px" @keyup.enter="loadPool" />
+          <el-input
+            v-model="poolKeyword"
+            placeholder="搜索书名或作者"
+            size="small"
+            style="width: 200px"
+            clearable
+            @keyup.enter="searchPool"
+            @clear="searchPool"
+          />
         </div>
         <div class="pool-grid" v-loading="poolLoading">
           <div v-for="book in poolBooks" :key="book.id" class="pool-item">
@@ -144,13 +235,21 @@ onMounted(() => {
               <p class="pool-author text-ellipsis">{{ book.author }}</p>
               <span class="pool-price">{{ formatPrice(book.price) }}</span>
             </div>
-            <el-button type="primary" size="small" @click="addBook(book)">添加</el-button>
+            <el-button
+              type="primary"
+              size="small"
+              :disabled="selectedBooks.some((b) => b.id === book.id)"
+              @click="addBook(book)"
+            >
+              {{ selectedBooks.some((b) => b.id === book.id) ? '已添加' : '添加' }}
+            </el-button>
           </div>
+          <el-empty v-if="!poolLoading && poolBooks.length === 0" description="没有匹配的图书" :image-size="70" />
         </div>
-        <div class="pool-pagination" v-if="poolTotal > 12">
+        <div class="pool-pagination" v-if="poolTotal > POOL_SIZE">
           <el-pagination
             v-model:current-page="poolPage"
-            :page-size="12"
+            :page-size="POOL_SIZE"
             :total="poolTotal"
             layout="prev, pager, next"
             background
@@ -162,7 +261,7 @@ onMounted(() => {
       <!-- 右：已选图书 -->
       <div class="selected-panel card">
         <div class="panel-header">
-          <h3>已选图书（{{ selectedBooks.length }}）</h3>
+          <h3>已选图书（{{ selectedBooks.length }}/200）</h3>
           <span class="drag-tip">拖拽可调整顺序</span>
         </div>
         <div v-if="selectedBooks.length === 0" class="empty-selected">
@@ -208,6 +307,13 @@ onMounted(() => {
   display: flex;
   gap: 12px;
   align-items: center;
+  flex-wrap: wrap;
+}
+
+.form-tip {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-sub);
 }
 
 .edit-body {

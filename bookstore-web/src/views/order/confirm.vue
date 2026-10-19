@@ -1,8 +1,8 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { getAddressList } from '@/api/address'
-import { createOrder } from '@/api/order'
+import { createOrder, settlePreview } from '@/api/order'
 import { useCartStore } from '@/stores/cart'
 import { clearBuyNow, peekBuyNow } from '@/utils/buy-now'
 import { formatPrice } from '@/utils/format'
@@ -17,6 +17,16 @@ const selectedAddressId = ref(null)
 const addressDrawer = ref(false)
 const submitting = ref(false)
 
+/**
+ * 结算预览（S5）。
+ *
+ * <p>金额一律以服务端返回的为准，不在前端自己算运费 —— 门槛和费率随时可能被后台调整，
+ * 前端算的和服务端一旦不一致，用户看到「免运费」、提交后却多出一笔运费，
+ * 是典型的信任崩塌点。这里只求「看到的就是要付的」。
+ */
+const settle = ref(null)
+const settling = ref(false)
+
 /** 来自「立即购买」时只结算指定条目；为空表示按购物车勾选结算 */
 const buyNowIds = ref(peekBuyNow())
 const isBuyNow = computed(() => buyNowIds.value.length > 0)
@@ -28,15 +38,46 @@ const checkedItems = computed(() => {
   return cartStore.list.filter((i) => i.checked === 1)
 })
 
-// 用本地小计求和，而不是后端的 checkedAmount —— 立即购买时两者口径不同
-const totalAmount = computed(() =>
+// 本地小计只作兜底：预览接口没回来之前先把数字显示出来，不让金额区空着
+const localAmount = computed(() =>
   checkedItems.value.reduce((sum, i) => sum + Number(i.subtotal ?? i.price * i.quantity ?? 0), 0)
 )
 const totalQuantity = computed(() => checkedItems.value.reduce((s, i) => s + i.quantity, 0))
 
+const goodsAmount = computed(() => Number(settle.value?.goodsAmount ?? localAmount.value))
+const freightAmount = computed(() => Number(settle.value?.freightAmount ?? 0))
+const payableAmount = computed(() => Number(settle.value?.payableAmount ?? goodsAmount.value))
+const freeShipping = computed(() => freightAmount.value <= 0)
+/** 距离免运费还差多少（服务端算好，避免前端自己拿门槛做减法出现一分钱误差） */
+const amountToFreeShipping = computed(() => Number(settle.value?.amountToFreeShipping ?? 0))
+
 const selectedAddress = computed(() =>
   addresses.value.find((a) => a.id === selectedAddressId.value)
 )
+
+/**
+ * 拉一次结算预览。
+ *
+ * <p>始终显式传 `cartIds`，不用后端「按已勾选算」的默认行为：
+ * 「立即购买」结算的是购物车里的某几件，和勾选状态无关，
+ * 依赖默认行为会在用户顺手改了勾选之后算出另一笔钱。
+ */
+async function loadSettle() {
+  const ids = checkedItems.value.map((i) => i.id)
+  if (ids.length === 0) {
+    settle.value = null
+    return
+  }
+  settling.value = true
+  try {
+    settle.value = await settlePreview({ cartIds: ids })
+  } catch (e) {
+    // 预览失败就退回本地小计 + 不显示运费，宁可显示得保守一点
+    settle.value = null
+  } finally {
+    settling.value = false
+  }
+}
 
 async function loadAddresses() {
   try {
@@ -87,7 +128,11 @@ async function submitOrder() {
 onMounted(async () => {
   await cartStore.fetchCart()
   await loadAddresses()
+  await loadSettle()
 })
+
+// 勾选 / 数量变了，金额和运费都要跟着重算（数量会影响是否达到包邮门槛）
+watch(checkedItems, loadSettle)
 
 // 离开结算页时清掉标记，避免下次进结算页还在结算「上次立即购买」的那本
 onUnmounted(clearBuyNow)
@@ -168,18 +213,22 @@ onUnmounted(clearBuyNow)
     </div>
 
     <!-- 金额汇总 + 提交 -->
-    <div class="section card amount-section">
+    <div class="section card amount-section" v-loading="settling">
       <div class="amount-row">
         <span>商品总额：</span>
-        <span>{{ formatPrice(totalAmount) }}</span>
+        <span>{{ formatPrice(goodsAmount) }}</span>
       </div>
       <div class="amount-row">
         <span>运费：</span>
-        <span class="free">免运费</span>
+        <span v-if="freeShipping" class="free">免运费</span>
+        <span v-else class="freight">{{ formatPrice(freightAmount) }}</span>
+      </div>
+      <div v-if="!freeShipping && amountToFreeShipping > 0" class="free-tip">
+        再买 {{ formatPrice(amountToFreeShipping) }} 即可免运费
       </div>
       <div class="amount-row total">
         <span>应付金额：</span>
-        <span class="total-price">{{ formatPrice(totalAmount) }}</span>
+        <span class="total-price">{{ formatPrice(payableAmount) }}</span>
       </div>
       <div class="submit-row">
         <el-button type="primary" size="large" :loading="submitting" @click="submitOrder">
@@ -352,6 +401,20 @@ onUnmounted(clearBuyNow)
 
 .free {
   color: #67c23a;
+}
+
+.freight {
+  color: var(--brand);
+  font-weight: 600;
+}
+
+.free-tip {
+  width: 100%;
+  max-width: 320px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--brand);
+  margin: -4px 0 8px;
 }
 
 .total-price {

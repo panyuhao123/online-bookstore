@@ -1,18 +1,22 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getBook, pageBooks } from '@/api/book'
 import { getCategories } from '@/api/category'
 import { pageBookReviews, getReviewSummary } from '@/api/review'
+import { subscribeStockNotice, unsubscribeStockNotice, pageMyStockNotices } from '@/api/stock-notice'
 import CompareBar from '@/components/CompareBar.vue'
 import BookCard from '@/components/BookCard.vue'
 import { useCompareStore } from '@/stores/compare'
 import { useCartStore } from '@/stores/cart'
 import { useHistoryStore } from '@/stores/history'
+import { useUserStore } from '@/stores/user'
+import { useFreightStore } from '@/stores/freight'
 import { addToCartGuarded } from '@/utils/cart-action'
 import { setBuyNow } from '@/utils/buy-now'
 import { formatPrice, formatRating, formatDateTime } from '@/utils/format'
 import { bookCover, placeholderCover } from '@/utils/image'
+import { bookBadges } from '@/utils/badges'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const route = useRoute()
@@ -20,6 +24,8 @@ const router = useRouter()
 const compareStore = useCompareStore()
 const cartStore = useCartStore()
 const historyStore = useHistoryStore()
+const userStore = useUserStore()
+const freightStore = useFreightStore()
 
 const book = ref(null)
 const loading = ref(true)
@@ -45,14 +51,74 @@ const similarBooks = ref([])
 const cover = computed(() => (book.value ? bookCover(book.value) || placeholderCover(book.value.title) : ''))
 const soldOut = computed(() => book.value?.stock <= 0)
 
+/** 徽标（N5）：售罄 / 仅剩 N 件 / 热销 / 好评 / 包邮 */
+const badges = computed(() =>
+  bookBadges(book.value, {
+    freeEnabled: freightStore.enabled,
+    freeThreshold: freightStore.freeThreshold,
+    limit: 4
+  })
+)
+
+/** 到货提醒（N7）：仅售罄图书可订阅 */
+const noticeSubscribed = ref(false)
+const noticeLoading = ref(false)
+
+async function loadStockNotice() {
+  if (!userStore.isLogin || !soldOut.value) {
+    noticeSubscribed.value = false
+    return
+  }
+  try {
+    // 没有「按 bookId 查订阅状态」的接口，从我的订阅列表里找 —— 单页 50 条足够覆盖，
+    // 超出的场景只是订阅了很多书，此时按钮默认显示「到货提醒我」，重复订阅后端会幂等处理。
+    const res = await pageMyStockNotices({ pageNum: 1, pageSize: 50 })
+    noticeSubscribed.value = (res.list || []).some((n) => String(n.bookId) === String(book.value.id))
+  } catch (e) {
+    noticeSubscribed.value = false
+  }
+}
+
+async function toggleStockNotice() {
+  if (!userStore.isLogin) {
+    ElMessage.warning('请先登录后再订阅到货提醒')
+    router.push('/login')
+    return
+  }
+  noticeLoading.value = true
+  try {
+    if (noticeSubscribed.value) {
+      await unsubscribeStockNotice(book.value.id)
+      noticeSubscribed.value = false
+      ElMessage.info('已取消到货提醒')
+    } else {
+      await subscribeStockNotice(book.value.id)
+      noticeSubscribed.value = true
+      ElMessage.success('已订阅，补货后会第一时间提醒你')
+    }
+  } catch (e) {
+    /* 拦截器已提示 */
+  } finally {
+    noticeLoading.value = false
+  }
+}
+
 async function loadBook() {
   loading.value = true
+  // 切换图书时先把上一本的残留清掉，否则新数据到达前会短暂看到"别人的评分/评价"
+  reviewPage.value = 1
+  reviews.value = []
+  reviewTotal.value = 0
+  reviewSummary.value = null
+  similarBooks.value = []
+  noticeSubscribed.value = false
   try {
     book.value = await getBook(route.params.id)
     historyStore.addRecord(book.value)
     loadReviews()
     loadReviewSummary()
     loadSimilar()
+    loadStockNotice()
   } catch (e) {
     /* 静默 */
   } finally {
@@ -78,17 +144,53 @@ async function loadReviewSummary() {
   }
 }
 
+/**
+ * 同类推荐（N2）。
+ *
+ * <p>只看同分类有个明显缺口：冷门分类（比如只有一两本书）的详情页会几乎没有推荐。
+ * 所以做成「同分类优先，同价位补足」—— 同价位用当前书价的 ±30% 区间跨分类取，
+ * 这样"同类"退化成了"同档次"，对读者来说仍然是可解释的推荐理由。
+ */
 async function loadSimilar() {
-  if (!book.value?.categoryId) return
+  const current = book.value
+  if (!current) return
+  const result = []
+  const seen = new Set([String(current.id)])
+
+  const push = (books) => {
+    for (const b of books || []) {
+      if (seen.has(String(b.id))) continue
+      seen.add(String(b.id))
+      result.push(b)
+    }
+  }
+
   try {
-    const res = await pageBooks({
-      categoryId: book.value.categoryId,
-      pageNum: 1,
-      pageSize: 6,
-      sort: 'sales'
-    })
-    // 排除自己
-    similarBooks.value = (res.list || []).filter((b) => b.id !== book.value.id).slice(0, 5)
+    if (current.categoryId) {
+      const res = await pageBooks({
+        categoryId: current.categoryId,
+        pageNum: 1,
+        pageSize: 12,
+        sort: 'sales'
+      })
+      push(res.list)
+    }
+
+    if (result.length < 5) {
+      const price = Number(current.price || 0)
+      if (price > 0) {
+        const res = await pageBooks({
+          minPrice: Math.max(1, Math.round(price * 0.7 * 100) / 100),
+          maxPrice: Math.round(price * 1.3 * 100) / 100,
+          pageNum: 1,
+          pageSize: 12,
+          sort: 'sales'
+        })
+        push(res.list)
+      }
+    }
+
+    similarBooks.value = result.slice(0, 5)
   } catch (e) {
     /* 静默 */
   }
@@ -122,8 +224,14 @@ onMounted(async () => {
   } catch (e) {
     /* 静默 */
   }
+  // 运费规则用于「包邮」徽标与免运费提示；拿不到时 store 内部降级为不显示徽标
+  freightStore.ensure().catch(() => {})
   loadBook()
 })
+
+// 从「同类推荐」点进另一本书时路由参数变了但组件被复用，onMounted 不会重跑 ——
+// 不监听参数的话页面会一直停在上本书的数据上。
+watch(() => route.params.id, loadBook)
 
 const distribution = computed(() => reviewSummary.value?.distribution || [])
 const maxCount = computed(() => Math.max(...distribution.value.map((d) => d.count || 0), 1))
@@ -138,7 +246,19 @@ const maxCount = computed(() => Math.max(...distribution.value.map((d) => d.coun
           <img :src="cover" :alt="book.title" class="main-cover" />
         </div>
         <div class="info-section">
-          <h1 class="book-title">{{ book.title }}</h1>
+          <h1 class="book-title">
+            {{ book.title }}
+            <el-tag
+              v-for="b in badges"
+              :key="b.key"
+              :type="b.type"
+              size="small"
+              effect="plain"
+              class="title-badge"
+            >
+              {{ b.text }}
+            </el-tag>
+          </h1>
           <div class="book-meta">
             <span>作者：{{ book.author }}</span>
             <span>出版社：{{ book.publisher }}</span>
@@ -155,6 +275,15 @@ const maxCount = computed(() => Math.max(...distribution.value.map((d) => d.coun
             <span class="current-price">{{ formatPrice(book.price) }}</span>
             <span v-if="book.stock > 0" class="stock-tag">有货（库存 {{ book.stock }}）</span>
             <span v-else class="stock-tag out">已售罄</span>
+            <span
+              v-if="freightStore.enabled && freightStore.isFreeShipping(book.price)"
+              class="free-tag"
+            >
+              满 {{ formatPrice(freightStore.freeThreshold) }} 包邮
+            </span>
+            <span v-else-if="freightStore.enabled" class="free-tag muted">
+              再买 {{ formatPrice(freightStore.amountToFreeShipping(book.price)) }} 包邮
+            </span>
           </div>
 
           <div class="action-row">
@@ -167,6 +296,17 @@ const maxCount = computed(() => Math.max(...distribution.value.map((d) => d.coun
               <el-icon><ShoppingCart /></el-icon> 加入购物车
             </el-button>
             <el-button type="danger" size="large" :disabled="soldOut" @click="buyNow">立即购买</el-button>
+            <!-- 售罄时给一条明确的出路：留个联系方式等补货，比只能干看着强 -->
+            <el-button
+              v-if="soldOut"
+              type="warning"
+              size="large"
+              :loading="noticeLoading"
+              @click="toggleStockNotice"
+            >
+              <el-icon><Bell /></el-icon>
+              {{ noticeSubscribed ? '已订阅到货提醒' : '到货提醒我' }}
+            </el-button>
             <el-button size="large" @click="addToCompare">
               <el-icon><ScaleToOriginal /></el-icon> 加入对比
             </el-button>
@@ -267,7 +407,7 @@ const maxCount = computed(() => Math.max(...distribution.value.map((d) => d.coun
             <span class="floor-bar" />
             <h2>同类推荐</h2>
           </div>
-          <el-link type="primary" @click="router.push('/books?categoryId=' + book.categoryId)">查看更多 ›</el-link>
+          <el-link type="primary" @click="router.push('/catalog?categoryId=' + book.categoryId)">查看更多 ›</el-link>
         </div>
         <div class="book-grid">
           <BookCard v-for="b in similarBooks" :key="b.id" :book="b" />
@@ -318,6 +458,28 @@ const maxCount = computed(() => Math.max(...distribution.value.map((d) => d.coun
   font-weight: 700;
   color: var(--text-primary);
   line-height: 1.3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.title-badge {
+  font-weight: 400;
+  flex-shrink: 0;
+}
+
+.free-tag {
+  font-size: 13px;
+  color: #67c23a;
+  background: rgba(103, 194, 58, 0.1);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.free-tag.muted {
+  color: var(--text-sub);
+  background: var(--bg-fill);
 }
 
 .book-meta {

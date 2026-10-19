@@ -2,14 +2,13 @@
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCartStore } from '@/stores/cart'
-import { useBooklistStore } from '@/stores/booklist'
+import { addBooksToPickedBooklist } from '@/utils/booklist-action'
 import { formatPrice } from '@/utils/format'
 import { bookCover, placeholderCover } from '@/utils/image'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()
 const cartStore = useCartStore()
-const booklistStore = useBooklistStore()
 
 /**
  * 「已勾选」既是结算依据，也是批量操作的依据。
@@ -88,31 +87,8 @@ async function batchAddToBooklist() {
     ElMessage.warning('请先选择商品')
     return
   }
-  const lists = booklistStore.booklists
-  if (lists.length === 0) {
-    ElMessage.info('暂无书单，请先创建书单')
-    router.push('/booklists/new')
-    return
-  }
-  try {
-    const { value } = await ElMessageBox.prompt('选择要加入的书单', '加入书单', {
-      inputType: 'select',
-      inputOptions: lists.map((l) => ({ value: l.id, label: l.name })),
-      confirmButtonText: '加入',
-      cancelButtonText: '取消'
-    })
-    const books = selectedRows.value.map((i) => ({
-      id: i.bookId,
-      title: i.title,
-      coverUrl: i.coverUrl,
-      price: i.price,
-      author: i.author
-    }))
-    booklistStore.addBooksToList(Number(value), books)
-    ElMessage.success('已加入书单')
-  } catch (e) {
-    /* 取消 */
-  }
+  // 购物车行的图书 id 在 bookId 上，统一交给公共动作去取
+  await addBooksToPickedBooklist(selectedRows.value, { router })
 }
 
 function goCheckout() {

@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { getOrder, payOrder, cancelOrder, confirmOrder } from '@/api/order'
 import { getReviewableItems, createReview } from '@/api/review'
 import { orderStatusText, orderStatusTagType, formatPrice, formatDateTime } from '@/utils/format'
+import { exportReceipt } from '@/utils/excel'
 import { bookCover, placeholderCover } from '@/utils/image'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -24,19 +25,34 @@ const reviewForm = reactive({
   anonymous: false
 })
 
+/**
+ * 订单时间线（N3）。
+ *
+ * <p>四个节点的耗时字段是分开的：`createTime` / `payTime` / `shipTime` / `finishTime`。
+ * 早先只有前两个能显示，发货和收货的节点永远空着 —— 用户看到"已发货"却没有任何时间，
+ * 会怀疑是不是没真发。W1 给 orders 补了这两列，这里接上。
+ */
 const timeline = computed(() => {
   if (!order.value) return []
-  const steps = [
-    { time: order.value.createTime, text: '提交订单', done: true },
-    { time: order.value.payTime, text: '支付成功', done: order.value.status >= 2 },
-    { time: null, text: '商家发货', done: order.value.status >= 3 },
-    { time: null, text: '确认收货', done: order.value.status >= 4 }
-  ]
-  if (order.value.status === 5) {
-    return [{ time: order.value.createTime, text: '订单已取消', done: true }]
+  const o = order.value
+  if (o.status === 5) {
+    return [{ time: o.createTime, text: '订单已取消', done: true }]
   }
-  return steps
+  return [
+    { time: o.createTime, text: '提交订单', done: true },
+    { time: o.payTime, text: '支付成功', done: o.status >= 2 },
+    { time: o.shipTime, text: '商家发货', done: o.status >= 3 },
+    { time: o.finishTime, text: '确认收货', done: o.status >= 4 }
+  ]
 })
+
+const doneStepCount = computed(() => timeline.value.filter((s) => s.done).length)
+
+/** 小票导出（N8）：把这一单导成 Excel，含订单信息、明细与三项金额 */
+function onExportReceipt() {
+  if (!order.value) return
+  exportReceipt(order.value, `小票_${order.value.orderNo || order.value.id}`)
+}
 
 async function loadOrder() {
   loading.value = true
@@ -147,6 +163,9 @@ onMounted(loadOrder)
             <el-button v-if="order.status === 1" type="primary" @click="onPay">立即支付</el-button>
             <el-button v-if="order.status === 1" @click="onCancel">取消订单</el-button>
             <el-button v-if="order.status === 3" type="success" @click="onConfirm">确认收货</el-button>
+            <el-button @click="onExportReceipt">
+              <el-icon><Download /></el-icon> 导出小票
+            </el-button>
           </div>
         </div>
       </div>
@@ -154,12 +173,12 @@ onMounted(loadOrder)
       <!-- 订单时间线 -->
       <div class="section card">
         <h3 class="section-title">订单状态</h3>
-        <el-steps :active="timeline.filter(s => s.done).length" finish-status="success">
+        <el-steps :active="doneStepCount" finish-status="success" align-center>
           <el-step
             v-for="(step, idx) in timeline"
             :key="idx"
             :title="step.text"
-            :description="step.time ? formatDateTime(step.time) : ''"
+            :description="step.time ? formatDateTime(step.time) : '—'"
           />
         </el-steps>
       </div>
@@ -211,7 +230,7 @@ onMounted(loadOrder)
         </el-table>
       </div>
 
-      <!-- 金额汇总 -->
+      <!-- 金额汇总：商品小计 + 运费 = 应付，口径与结算页一致 -->
       <div class="section card amount-section">
         <div class="amount-row">
           <span>商品总额：</span>
@@ -219,11 +238,16 @@ onMounted(loadOrder)
         </div>
         <div class="amount-row">
           <span>运费：</span>
-          <span class="free">免运费</span>
+          <span v-if="Number(order.freightAmount || 0) > 0" class="freight">
+            {{ formatPrice(order.freightAmount) }}
+          </span>
+          <span v-else class="free">免运费</span>
         </div>
         <div class="amount-row total">
           <span>实付金额：</span>
-          <span class="total-price">{{ formatPrice(order.totalAmount) }}</span>
+          <span class="total-price">
+            {{ formatPrice(order.payableAmount ?? order.totalAmount) }}
+          </span>
         </div>
       </div>
     </template>
@@ -420,6 +444,11 @@ onMounted(loadOrder)
 
 .free {
   color: #67c23a;
+}
+
+.freight {
+  color: var(--brand);
+  font-weight: 600;
 }
 
 .total-price {

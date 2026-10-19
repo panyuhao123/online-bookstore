@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router'
 import { bookCover, placeholderCover } from '@/utils/image'
 import { formatPrice, formatRating } from '@/utils/format'
 import { useCompareStore } from '@/stores/compare'
+import { useFreightStore } from '@/stores/freight'
+import { bookBadges } from '@/utils/badges'
 import { addToCartGuarded } from '@/utils/cart-action'
 import { ShoppingCart, DataAnalysis } from '@element-plus/icons-vue'
 
@@ -13,12 +15,23 @@ const props = defineProps({
 
 const router = useRouter()
 const compareStore = useCompareStore()
+// 运费规则由布局层统一拉取，卡片只读不请求（一屏二三十张卡片不能各自去打接口）
+const freightStore = useFreightStore()
 
 const isHover = ref(false)
 const cover = computed(() => bookCover(props.book) || placeholderCover(props.book.title))
 const soldOut = computed(() => props.book.stock <= 0)
 // 依赖 compare store 的响应式状态，加入/移出对比后卡片标记会立即更新
 const inCompare = computed(() => compareStore.has(props.book.id))
+
+/** 卡片位置有限，只留最要紧的两个（售罄会独占） */
+const badges = computed(() =>
+  bookBadges(props.book, {
+    freeEnabled: freightStore.enabled,
+    freeThreshold: freightStore.freeThreshold,
+    limit: 2
+  })
+)
 
 function addCart() {
   return addToCartGuarded(props.book, { router })
@@ -42,7 +55,20 @@ function goDetail() {
   >
     <div class="cover">
       <img :src="cover" :alt="book.title" loading="lazy" />
-      <span v-if="soldOut" class="sold-out-tag">已售罄</span>
+
+      <!-- 徽标（N5）：放在 hover 浮层之前，鼠标移入时被浮层盖住，不挡快捷操作 -->
+      <div v-if="badges.length" class="badge-strip">
+        <el-tag
+          v-for="b in badges"
+          :key="b.key"
+          :type="b.type"
+          size="small"
+          effect="dark"
+          class="badge-item"
+        >
+          {{ b.text }}
+        </el-tag>
+      </div>
 
       <!-- hover 浮层快捷操作 -->
       <transition name="fade">
@@ -120,15 +146,19 @@ function goDetail() {
   transform: scale(1.04);
 }
 
-.sold-out-tag {
+.badge-strip {
   position: absolute;
   top: 8px;
-  right: 8px;
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
-  font-size: 12px;
-  padding: 2px 8px;
-  border-radius: 10px;
+  left: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.badge-item {
+  border: none;
 }
 
 .hover-overlay {

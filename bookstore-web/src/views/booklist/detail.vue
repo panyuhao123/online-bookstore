@@ -2,33 +2,43 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useBooklistStore } from '@/stores/booklist'
+import { useUserStore } from '@/stores/user'
 import { addBatchToCartGuarded, addToCartGuarded } from '@/utils/cart-action'
 import { formatPrice } from '@/utils/format'
 import BookCard from '@/components/BookCard.vue'
 import { exportToExcel } from '@/utils/excel'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { isOfficialId, getOfficialBooklist, fetchOfficialBooks } from '@/data/official-booklists'
 
 const route = useRoute()
 const router = useRouter()
 const booklistStore = useBooklistStore()
+const userStore = useUserStore()
 
 const viewMode = ref('card')
 const selectedBooks = ref([])
 const loading = ref(true)
 const notFound = ref(false)
+const forbidden = ref(false)
+const forbiddenMsg = ref('')
 
-/** 官方书单的图书来自接口解析，需要用 ref 装 */
+/**
+ * 官方书单的图书来自接口解析（规则 → 真实图书），需要用 ref 装；
+ * 后端书单直接读 store 里的 detail，两者在 books 计算属性里汇合，模板只认一个数组。
+ */
 const officialBooks = ref([])
+const backendDetail = ref(null)
 
 const listId = computed(() => route.params.id)
 const isOfficial = computed(() => isOfficialId(listId.value))
 const officialDef = computed(() => (isOfficial.value ? getOfficialBooklist(listId.value) : null))
 
-/** 个人书单直接用 store 里的数组，这样增删图书能自动反映到界面 */
-const localList = computed(() => (isOfficial.value ? null : booklistStore.getBooklist(listId.value)))
+const books = computed(() => (isOfficial.value ? officialBooks.value : backendDetail.value?.books || []))
 
-const books = computed(() => (isOfficial.value ? officialBooks.value : localList.value?.books || []))
+/** 只有后端书单才有「我的 / 别人的」之分 */
+const mine = computed(() => (isOfficial.value ? false : !!backendDetail.value?.mine))
+/** 平台已隐藏：创建者自己仍能打开，但要让本人知道状态 */
+const platformHidden = computed(() => !isOfficial.value && backendDetail.value?.status === 0)
 
 const header = computed(() => {
   if (isOfficial.value) {
@@ -37,15 +47,17 @@ const header = computed(() => {
       name: def?.name || '书单',
       description: def?.description || '',
       tag: def?.tag || '',
-      count: books.value.length
+      count: books.value.length,
+      owner: '官方'
     }
   }
-  const list = localList.value
+  const d = backendDetail.value
   return {
-    name: list?.name || '',
-    description: list?.description || '暂无描述',
+    name: d?.name || '',
+    description: d?.description || '暂无描述',
     tag: '',
-    count: books.value.length
+    count: books.value.length,
+    owner: d?.mine ? '我' : d?.ownerNickname || '书友'
   }
 })
 
@@ -53,11 +65,13 @@ const header = computed(() => {
  * 统一加载入口。
  *
  * <p>官方书单是「规则」（分类名 + 排序，或人工挑的书名），要经图书接口解析成真实图书；
- * 个人书单直接读 localStorage。两者在这里分流，模板只认 `books`。
+ * 后端书单直接调详情接口。两条路都归到 `books`，模板不必分叉。
  */
 async function load() {
   loading.value = true
   notFound.value = false
+  forbidden.value = false
+
   try {
     if (isOfficial.value) {
       if (!officialDef.value) {
@@ -65,11 +79,19 @@ async function load() {
         return
       }
       officialBooks.value = await fetchOfficialBooks(officialDef.value)
-    } else if (!localList.value) {
+      return
+    }
+
+    backendDetail.value = await booklistStore.fetchDetail(listId.value)
+  } catch (e) {
+    // 403 = 别人的私密书单（后端刻意不回 404：自增 ID 藏不住存在性，
+    // 说「不存在」只会让创建者以为自己书单丢了）；404 = 真的没有或已被删除
+    if (e?.code === 403) {
+      forbidden.value = true
+      forbiddenMsg.value = e.message || '该书单仅创建者可见'
+    } else {
       notFound.value = true
     }
-  } catch (e) {
-    notFound.value = true
   } finally {
     loading.value = false
   }
@@ -101,9 +123,50 @@ function exportList() {
   exportToExcel(books.value, columns, '书单_' + header.value.name)
 }
 
-function removeBook(bookId) {
-  booklistStore.removeBookFromList(listId.value, bookId)
-  ElMessage.success('已移除')
+async function removeBook(book) {
+  try {
+    await ElMessageBox.confirm(`确认把《${book.title}》移出书单？`, '提示', { type: 'warning' })
+    await booklistStore.removeBook(listId.value, book.id)
+    backendDetail.value = booklistStore.detail
+    ElMessage.success('已移除')
+  } catch (e) {
+    /* 取消或接口报错 */
+  }
+}
+
+/**
+ * 把官方书单收藏为自己的书单。
+ *
+ * <p>为什么是「复制」而不是「引用」：官方书单是前端规则，随代码发布变化，
+ * 一旦它是引用关系，用户刚收藏的书单可能因为规则调整而内容突变。
+ * 复制一份实体数据，用户之后想怎么改都行 —— 这才符合"收藏"的语义。
+ */
+const collecting = ref(false)
+async function collectAsMine() {
+  if (!userStore.isLogin) {
+    ElMessage.warning('请先登录')
+    router.push('/login')
+    return
+  }
+  if (books.value.length === 0) {
+    ElMessage.warning('该精选书单暂无图书，无法收藏')
+    return
+  }
+  collecting.value = true
+  try {
+    const created = await booklistStore.create({
+      name: header.value.name,
+      description: header.value.description || '',
+      isPublic: 0
+    })
+    const res = await booklistStore.addBooks(created.id, books.value.map((b) => b.id))
+    ElMessage.success(`已收藏为我的书单，共 ${res.added} 本`)
+    router.push('/booklists/' + created.id)
+  } catch (e) {
+    /* 拦截器已提示 */
+  } finally {
+    collecting.value = false
+  }
 }
 
 onMounted(load)
@@ -112,8 +175,20 @@ watch(listId, load)
 
 <template>
   <div class="page-container booklist-detail" v-loading="loading">
+    <!-- 别人的私密书单 -->
     <el-result
-      v-if="notFound && !loading"
+      v-if="forbidden && !loading"
+      icon="warning"
+      title="该书单仅创建者可见"
+      :sub-title="forbiddenMsg"
+    >
+      <template #extra>
+        <el-button type="primary" @click="router.push('/booklists')">返回书单列表</el-button>
+      </template>
+    </el-result>
+
+    <el-result
+      v-else-if="notFound && !loading"
       icon="warning"
       title="书单不存在"
       sub-title="该书单可能已被删除，或链接不正确"
@@ -124,16 +199,38 @@ watch(listId, load)
     </el-result>
 
     <template v-else-if="!loading">
+      <!-- 被平台隐藏：内容仍可读，但要让创建者知道发生了什么 -->
+      <el-alert
+        v-if="platformHidden"
+        class="hidden-alert"
+        type="error"
+        show-icon
+        :closable="false"
+        title="该书单已被平台隐藏"
+        description="书单内容仅你自己可见，不会出现在书单广场。如需申诉请联系客服。"
+      />
+
       <div class="detail-header card">
         <div class="header-info">
           <h2>
             {{ header.name }}
-            <el-tag v-if="header.tag" size="small" type="danger" effect="plain" class="official-tag">
-              {{ isOfficial ? '官方' : '我的' }}
+            <el-tag v-if="isOfficial" size="small" type="danger" effect="plain" class="official-tag">
+              官方
             </el-tag>
+            <el-tag v-else-if="mine" size="small" type="success" effect="plain" class="official-tag">
+              我的
+            </el-tag>
+            <el-tag v-else-if="backendDetail?.isPublic === 1" size="small" type="info" effect="plain" class="official-tag">
+              公开
+            </el-tag>
+            <el-tag v-else size="small" type="info" effect="plain" class="official-tag">仅自己可见</el-tag>
           </h2>
           <p class="desc">{{ header.description }}</p>
-          <p class="meta">共 {{ header.count }} 本书</p>
+          <p class="meta">
+            共 {{ header.count }} 本书
+            <span class="dot">·</span>
+            {{ header.owner === '我' ? '我创建的' : header.owner === '官方' ? '官方精选' : header.owner + ' 的书单' }}
+          </p>
         </div>
         <div class="actions">
           <el-button-group>
@@ -144,6 +241,19 @@ watch(listId, load)
               表格
             </el-button>
           </el-button-group>
+          <!-- 官方书单：一键复制成自己的书单 -->
+          <el-button
+            v-if="isOfficial"
+            type="primary"
+            :loading="collecting"
+            :disabled="books.length === 0"
+            @click="collectAsMine"
+          >
+            <el-icon><Star /></el-icon> 收藏为我的书单
+          </el-button>
+          <el-button v-if="mine" @click="router.push('/booklists/' + listId + '/edit')">
+            <el-icon><Edit /></el-icon> 编辑
+          </el-button>
           <el-button :disabled="books.length === 0" @click="exportList">
             <el-icon><Download /></el-icon> 导出 Excel
           </el-button>
@@ -197,8 +307,8 @@ watch(listId, load)
             <el-button size="small" type="primary" link :disabled="row.stock <= 0" @click="addOne(row)">
               加购
             </el-button>
-            <!-- 官方书单是只读的，不提供「移除」 -->
-            <el-button v-if="!isOfficial" size="small" type="danger" link @click="removeBook(row.id)">
+            <!-- 只有自己的书单能改内容；官方书单与他人书单都是只读 -->
+            <el-button v-if="mine" size="small" type="danger" link @click="removeBook(row)">
               移除
             </el-button>
           </template>
@@ -206,10 +316,10 @@ watch(listId, load)
       </el-table>
 
       <el-empty v-if="books.length === 0" description="书单暂无图书">
-        <el-button v-if="!isOfficial" type="primary" @click="router.push('/books')">去挑书</el-button>
+        <el-button v-if="mine" type="primary" @click="router.push('/books')">去挑书</el-button>
       </el-empty>
 
-      <p v-if="!isOfficial && books.length > 0" class="tip">
+      <p v-if="mine && books.length > 0" class="tip">
         提示：在图书列表勾选图书后可「批量加书单」，也可以在详情页把图书加入本书单。
       </p>
     </template>
@@ -217,6 +327,10 @@ watch(listId, load)
 </template>
 
 <style scoped>
+.hidden-alert {
+  margin-bottom: 12px;
+}
+
 .detail-header {
   display: flex;
   justify-content: space-between;
@@ -249,11 +363,16 @@ watch(listId, load)
   color: var(--text-sub);
 }
 
+.dot {
+  margin: 0 6px;
+}
+
 .actions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
   flex-shrink: 0;
+  justify-content: flex-end;
 }
 
 .book-grid {

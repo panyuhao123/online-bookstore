@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { getBook } from '@/api/book'
 import { useCompareStore } from '@/stores/compare'
 import { addToCartGuarded } from '@/utils/cart-action'
+import { addBooksToPickedBooklist } from '@/utils/booklist-action'
 import { formatPrice, formatRating } from '@/utils/format'
 import { bookCover, placeholderCover } from '@/utils/image'
 
@@ -38,6 +39,15 @@ function removeBook(book) {
 
 function addToCart(book) {
   return addToCartGuarded(book, { router })
+}
+
+/** 加入书单：走公共动作，已有书单就选一个，没有就引导去新建 */
+function addToBooklist(book) {
+  return addBooksToPickedBooklist([book], { router })
+}
+
+function soldOut(book) {
+  return Number(book?.stock ?? 0) <= 0
 }
 
 // 判断某字段是否有差异，用于高亮
@@ -96,12 +106,22 @@ onMounted(loadBooks)
               </div>
             </td>
           </tr>
-          <!-- 加购按钮 -->
+          <!-- 操作按钮 -->
           <tr>
             <td class="field-col">操作</td>
             <td v-for="book in books" :key="book.id">
-              <el-button type="primary" size="small" @click="addToCart(book)">加入购物车</el-button>
-              <el-button size="small" @click="router.push('/books/' + book.id)">查看详情</el-button>
+              <div class="op-cell">
+                <el-button
+                  type="primary"
+                  size="small"
+                  :disabled="soldOut(book)"
+                  @click="addToCart(book)"
+                >
+                  {{ soldOut(book) ? '已售罄' : '加入购物车' }}
+                </el-button>
+                <el-button size="small" @click="addToBooklist(book)">加入书单</el-button>
+                <el-button size="small" @click="router.push('/books/' + book.id)">查看详情</el-button>
+              </div>
             </td>
           </tr>
           <!-- 各字段对比 -->
@@ -195,6 +215,18 @@ onMounted(loadBooks)
   background: var(--brand-weak);
   color: var(--brand);
   font-weight: 600;
+}
+
+.op-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.op-cell .el-button {
+  margin: 0;
+  width: 100%;
 }
 
 tr td {

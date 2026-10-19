@@ -3,14 +3,13 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { pageBooks } from '@/api/book'
 import { getCategories } from '@/api/category'
-import { useBooklistStore } from '@/stores/booklist'
 import { addBatchToCartGuarded } from '@/utils/cart-action'
+import { saveBooksToNewBooklist } from '@/utils/booklist-action'
 import { formatPrice, formatRating } from '@/utils/format'
 import { bookCover, placeholderCover } from '@/utils/image'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
-const booklistStore = useBooklistStore()
 
 const categories = ref([])
 const results = ref([])
@@ -105,18 +104,8 @@ async function saveToBooklist() {
     ElMessage.warning('请先选择图书')
     return
   }
-  try {
-    const { value } = await ElMessageBox.prompt('请输入书单名称', '保存为书单', {
-      confirmButtonText: '保存',
-      cancelButtonText: '取消'
-    })
-    const list = booklistStore.createBooklist(value)
-    booklistStore.addBooksToList(list.id, selectedBooks.value)
-    ElMessage.success(`已保存 ${selectedBooks.value.length} 本书到书单「${value}」`)
-    router.push('/booklists/' + list.id)
-  } catch (e) {
-    /* 取消 */
-  }
+  const created = await saveBooksToNewBooklist(selectedBooks.value, { router })
+  if (created) router.push('/booklists/' + created.id)
 }
 
 function goDetail(id) {

@@ -46,6 +46,13 @@ const routes = [
         meta: { title: '图书列表', breadcrumb: ['首页', '图书列表'] }
       },
       {
+        // 商品目录（S6）：不知道买什么时的"逛"入口，按分类平铺浏览
+        path: 'catalog',
+        name: 'Catalog',
+        component: () => import('@/views/catalog/index.vue'),
+        meta: { title: '商品目录', breadcrumb: ['首页', '商品目录'] }
+      },
+      {
         path: 'books/:id',
         name: 'BookDetail',
         component: () => import('@/views/book/detail.vue'),
@@ -127,7 +134,9 @@ const routes = [
         path: 'account/history',
         name: 'History',
         component: () => import('@/views/account/history.vue'),
-        meta: { title: '浏览历史', requiresAuth: true, breadcrumb: ['首页', '个人中心', '浏览历史'] }
+        // 不要求登录：未登录期间的浏览记录存在本地，也要能看；
+        // 页面内再引导登录同步（登录后由 /api/history/merge 合并到账号）
+        meta: { title: '浏览历史', breadcrumb: ['首页', '个人中心', '浏览历史'] }
       },
       {
         path: 'account/reviews',

@@ -35,6 +35,7 @@ public class BookListDetailVO extends BookListVO {
         vo.setCoverUrl(base.getCoverUrl());
         vo.setIsPublic(base.getIsPublic());
         vo.setBookCount(base.getBookCount());
+        vo.setStatus(base.getStatus());
         vo.setOwnerId(base.getOwnerId());
         vo.setOwnerNickname(base.getOwnerNickname());
         vo.setMine(base.getMine());

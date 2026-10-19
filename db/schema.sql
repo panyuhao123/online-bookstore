@@ -15,6 +15,7 @@
 --   V4__book_review.sql          本文件第 10 节
 --   V5__address_adcode_columns.sql  address 表的 province_adcode / city_adcode / district_adcode
 --   V6__booklist_history_banner_freight.sql  本文件第 11~16 节 + orders 表补 freight_amount / ship_time / finish_time
+--   V7__book_list_status.sql     book_list 表补 status（平台治理）与 idx_book_list_status_time
 --   历史手工脚本已归档至 db/legacy/
 --
 -- 【手工建库（可选，正常不需要）】
@@ -254,8 +255,9 @@ CREATE TABLE `review`
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '图书评价';
 
 -- ---------------------------------------------------------------------
--- 11. 用户书单表 book_list（对应迁移 V6）
+-- 11. 用户书单表 book_list（对应迁移 V6；status 列由 V7 追加）
 --     此前书单只存在浏览器 localStorage 里，换设备就丢；落库后可跨端、可分享、可管理
+--     is_public 是「用户自己的公开/私密」，status 是「平台是否隐藏」，两者语义正交
 -- ---------------------------------------------------------------------
 DROP TABLE IF EXISTS `book_list`;
 CREATE TABLE `book_list` (
@@ -266,13 +268,16 @@ CREATE TABLE `book_list` (
     `cover_url`   VARCHAR(500) DEFAULT NULL COMMENT '封面图地址（为空时前端按首本书封面兜底）',
     `is_public`   TINYINT      NOT NULL DEFAULT 1 COMMENT '是否公开：1-公开 0-仅自己可见',
     `book_count`  INT          NOT NULL DEFAULT 0 COMMENT '书单内图书数量（冗余计数，列表页免 count）',
+    `status`      TINYINT      NOT NULL DEFAULT 1 COMMENT '状态：1-正常 0-已隐藏（平台治理用，与 is_public 语义正交）',
     `create_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     -- 书单广场主路径：公开书单按创建时间倒序
     KEY `idx_book_list_public_time` (`is_public`, `create_time`),
     -- 「我的书单」
-    KEY `idx_book_list_user` (`user_id`)
+    KEY `idx_book_list_user` (`user_id`),
+    -- 管理端治理主路径：按状态筛选 + 创建时间倒序
+    KEY `idx_book_list_status_time` (`status`, `create_time`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '用户书单';
 
 -- ---------------------------------------------------------------------

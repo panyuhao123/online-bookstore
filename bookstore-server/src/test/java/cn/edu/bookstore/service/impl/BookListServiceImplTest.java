@@ -84,6 +84,10 @@ class BookListServiceImplTest {
         l.setName(name);
         l.setIsPublic(isPublic);
         l.setBookCount(0);
+        // 存量与新建书单一律是「正常」状态（V7 的 DEFAULT 1）。
+        // 造数据时显式写上，避免单测里出现「status=null」这种线上不存在的形态 ——
+        // 那会让「隐藏判定」用一个空值走过，看起来通过、其实没测到。
+        l.setStatus(1);
         return l;
     }
 
@@ -208,6 +212,34 @@ class BookListServiceImplTest {
 
             assertEquals(1, vo.getBooks().size());
             assertEquals("算法导论", vo.getBooks().get(0).getTitle());
+        }
+
+        @Test
+        @DisplayName("平台已隐藏的书单：他人访问 404（隐藏就是要让内容不可见，回 403 等于告诉对方「这里有东西」）")
+        void hiddenListInvisibleToOthers() {
+            BookList hidden = list(1L, OTHER_USER_ID, 1, "违规书单");
+            hidden.setStatus(0);
+            when(bookListMapper.selectById(1L)).thenReturn(hidden);
+
+            BusinessException ex = assertThrows(BusinessException.class,
+                    () -> bookListService.detail(USER_ID, 1L));
+
+            assertEquals(ErrorCode.NOT_FOUND.getCode(), ex.getErrorCode().getCode());
+        }
+
+        @Test
+        @DisplayName("平台已隐藏的书单：创建者本人仍能打开，且 status=0（否则用户以为数据丢了）")
+        void hiddenListReadableByOwner() {
+            BookList hidden = list(1L, USER_ID, 1, "被误判的书单");
+            hidden.setStatus(0);
+            when(bookListMapper.selectById(1L)).thenReturn(hidden);
+            when(bookListItemMapper.selectList(any())).thenReturn(List.of());
+            when(userMapper.selectBatchIds(anyList())).thenReturn(List.of(user(USER_ID, "小王")));
+
+            BookListDetailVO vo = bookListService.detail(USER_ID, 1L);
+
+            assertEquals(0, vo.getStatus().intValue(), "创建者要看到「已被隐藏」的状态，前端才能给出提示");
+            assertTrue(vo.getMine());
         }
     }
 
@@ -538,6 +570,25 @@ class BookListServiceImplTest {
             verify(bookListMapper).selectPage(captor.capture(), any());
             assertEquals(1L, captor.getValue().getCurrent());
             assertEquals(50L, captor.getValue().getSize());
+        }
+
+        @Test
+        @DisplayName("广场恒按 status=1 过滤：平台隐藏的书单不能从「自己的那一支」漏出来")
+        void excludesHiddenListsEvenForOwner() {
+            stubPage(List.of());
+            when(userMapper.selectBatchIds(anyList())).thenReturn(List.of());
+
+            bookListService.page(USER_ID, 1L, 12L, null);
+
+            ArgumentCaptor<Wrapper<BookList>> captor = ArgumentCaptor.forClass(Wrapper.class);
+            verify(bookListMapper).selectPage(any(), captor.capture());
+            String sql = sqlOf(captor.getValue());
+            // status 条件必须与 or 分组并列，而不是被 or 进去：
+            // 一旦写进 .and(w -> w.eq(isPublic).or().eq(userId))，
+            // 就变成「(公开 or 自己的) and status=1」以外的语义，隐藏书单会漏出
+            assertTrue(sql.contains("status"), "广场查询缺少 status 条件：" + sql);
+            assertTrue(sql.indexOf("status") < sql.indexOf("is_public"),
+                    "status 必须是 AND 链上的前置条件，不能落在 or 分组里：" + sql);
         }
     }
 

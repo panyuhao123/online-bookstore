@@ -38,6 +38,15 @@ public class BookListVO {
     /** 书单内图书数量 */
     private Integer bookCount;
 
+    /**
+     * 平台治理状态：1-正常 0-已隐藏。
+     *
+     * <p>用户端也要下发这个字段：书单被平台隐藏后，「我的书单」里仍保留该条记录
+     * （不凭空消失，否则用户会以为数据丢了），前端据此渲染「该内容已被隐藏」的提示。
+     * 广场列表只下发 status=1 的条目，因此那里恒为 1。
+     */
+    private Integer status;
+
     /** 创建者用户 ID */
     private Long ownerId;
 
@@ -68,6 +77,7 @@ public class BookListVO {
         vo.setCoverUrl(list.getCoverUrl());
         vo.setIsPublic(list.getIsPublic());
         vo.setBookCount(list.getBookCount());
+        vo.setStatus(list.getStatus());
         vo.setOwnerId(list.getUserId());
         vo.setCreateTime(list.getCreateTime());
         vo.setUpdateTime(list.getUpdateTime());

@@ -47,6 +47,18 @@ public class BookList {
     /** 书单内图书数量（冗余计数，只由 Service 维护） */
     private Integer bookCount;
 
+    /**
+     * 平台治理状态：1-正常 0-已隐藏。
+     *
+     * <p><b>与 {@link #isPublic} 语义正交，不可合并。</b>isPublic 是「用户愿意给谁看」，
+     * status 是「平台允不允许展示」——「用户设了公开」+「平台已隐藏」是必须能表达的合法组合。
+     * 隐藏时不去改用户的 isPublic，恢复时才能原样还原成用户当初的选择。
+     *
+     * <p>沿用评价表的既有约定：<b>隐藏优先于删除</b>。隐藏后立即从前台消失，但数据仍在，
+     * 可追溯、可申诉、可恢复；物理删除只留给垃圾数据清理。
+     */
+    private Integer status;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 

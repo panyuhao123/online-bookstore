@@ -59,6 +59,12 @@ public class BookListServiceImpl implements BookListService {
     /** 单个书单的图书数量上限 */
     private static final int MAX_BOOKS_PER_LIST = 200;
 
+    /** 平台治理状态：1-正常 */
+    private static final int STATUS_NORMAL = 1;
+
+    /** 平台治理状态：0-已隐藏（与用户自己的 is_public 无关） */
+    private static final int STATUS_HIDDEN = 0;
+
     private final BookListMapper bookListMapper;
     private final BookListItemMapper bookListItemMapper;
     private final BookMapper bookMapper;
@@ -70,6 +76,10 @@ public class BookListServiceImpl implements BookListService {
         Long size = normalizePageSize(pageSize);
 
         LambdaQueryWrapper<BookList> wrapper = new LambdaQueryWrapper<BookList>()
+                // 广场只展示「平台未隐藏」的书单。这一条必须写在最外层与后续条件并列，
+                // 而不能并进下面的 or 分组 —— 并进去会变成「公开 or 自己的」之后再 or 掉状态，
+                // 被隐藏的书单就会从「自己创建」那一支漏出来。
+                .eq(BookList::getStatus, STATUS_NORMAL)
                 .and(w -> w
                         // 公开书单所有人可见
                         .eq(BookList::getIsPublic, 1)
@@ -94,6 +104,9 @@ public class BookListServiceImpl implements BookListService {
         Long num = normalizePageNum(pageNum);
         Long size = normalizePageSize(pageSize);
 
+        // 刻意**不**按 status 过滤：被平台隐藏的书单仍要在「我的书单」里可见。
+        // 否则用户眼里的现象是「我建的书单凭空消失了」—— 既无从申诉，也像是数据丢失。
+        // 正确做法是照常返回并带上 status=0，由前端渲染「该内容已被隐藏」的提示。
         LambdaQueryWrapper<BookList> wrapper = new LambdaQueryWrapper<BookList>()
                 .eq(BookList::getUserId, userId)
                 .orderByDesc(BookList::getCreateTime);
@@ -113,11 +126,20 @@ public class BookListServiceImpl implements BookListService {
         if (list == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "书单不存在或已被删除");
         }
+        // 平台已隐藏的书单：对非创建者一律当作「不存在」。
+        // 这里用 404 而不是 403 —— 隐藏的目的就是让内容不可见，
+        // 若回 403 等于告诉访客「这个 ID 上有东西，只是不给你看」，隐藏就失效了。
+        // 创建者本人仍可打开（能看见自己的内容、也知道发生了什么），
+        // 与「我的书单」不过滤 status 是同一套口径。
+        boolean hidden = Integer.valueOf(STATUS_HIDDEN).equals(list.getStatus());
+        boolean owner = currentUserId != null && list.getUserId().equals(currentUserId);
+        if (hidden && !owner) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "书单不存在或已被删除");
+        }
         // 私密书单只对创建者开放。这里显式抛 403 而不是「当作不存在返回 404」：
         // 书单 ID 是自增的，返回 404 并不能真正隐藏它的存在，反而会让创建者
         // 在排查自己书单打不开时看到误导性的「不存在」。
-        if (!Integer.valueOf(1).equals(list.getIsPublic())
-                && (currentUserId == null || !list.getUserId().equals(currentUserId))) {
+        if (!Integer.valueOf(1).equals(list.getIsPublic()) && !owner) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "该设为「仅自己可见」的书单只有创建者能查看");
         }
 
@@ -152,6 +174,9 @@ public class BookListServiceImpl implements BookListService {
         list.setIsPublic(Integer.valueOf(0).equals(request.getIsPublic()) ? 0 : 1);
         // 新书单必然为空，显式写 0 而不是依赖数据库默认值 —— 读代码时不必翻建表语句
         list.setBookCount(0);
+        // 同理，新书单必然是正常状态。这里显式写 1 还有一个作用：
+        // 让「status 只由管理端改变」这条规则在代码里看得见。
+        list.setStatus(STATUS_NORMAL);
         bookListMapper.insert(list);
 
         log.info("新建书单 userId={} listId={} name={}", userId, list.getId(), list.getName());

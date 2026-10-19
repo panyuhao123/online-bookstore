@@ -1,0 +1,185 @@
+/**
+ * 设计系统 Token（uni-app 自动注入每个组件的 scss，无需手动 import）。
+ * 只放变量、mixin，不要写具体样式规则。
+ *
+ * 规范出处：docs/线上书店App_UI设计规范.md
+ * 基准屏宽 750rpx（逻辑 375px），1rpx ≈ 0.5px。
+ * 页面样式只允许引用这里的 Token，禁止硬编码色值与字号。
+ */
+
+/* ================= 品牌色 ================= */
+$brand: #c8362f;          /* 朱砂红：主按钮、选中态、Tab 选中（白底对比 5.9:1 AA） */
+$brand-light: #e4574e;    /* 渐变端点、按压态 */
+$brand-dark: #a62a24;     /* 按压加深 */
+$brand-weak: #fdecea;     /* 标签底、弱提示底 */
+
+/* ================= 文字色 ================= */
+$text-main: #1f2126;      /* 标题 / 书名 / 金额（15.3:1 AAA） */
+$text-regular: #4e5259;   /* 正文 / 作者 / 表单值（8.2:1 AAA） */
+$text-sub: #8c9099;       /* 时间 / 销量 / 辅助（4.6:1 AA） */
+$text-placeholder: #b9bdc4; /* 输入框占位符 */
+
+/* ================= 背景与边框 ================= */
+$bg-page: #f4f5f7;        /* 页面背景 */
+$bg-card: #ffffff;        /* 卡片 / 底栏 */
+$bg-skeleton: #ebecef;    /* 骨架屏 */
+$bg-fill: #f0f1f3;        /* 输入框填充、次要按钮底 */
+$border-color: #edeef0;   /* 1rpx 分割线 */
+$border-strong: #d8d9dc;  /* 描边、复选框未选 */
+
+/* ================= 语义色 ================= */
+$success: #2f9e44;
+$success-light: #51cf66;
+$warning: #e8912a;
+$warning-light: #f59f00;
+$warning-weak: #fff7e6;    /* 警告提示底 */
+$warning-strong: #9a6b12;  /* 警告提示文字 */
+$error: #e03131;
+$info: #1c7ed6;
+$info-light: #4dabf7;
+
+/* 中性：取消态、禁用图标底 */
+$neutral: #868e96;
+$neutral-light: #adb5bd;
+
+/* 纯白：用于深色底上的文字，避免语义混淆地复用 $bg-card */
+$color-white: #ffffff;
+$bg-icon-muted: #e9eaed;
+
+/* ================= 价格色 ================= */
+$price-color: #c8362f;    /* 与品牌同色，靠字重/字号区分层级 */
+
+/* ================= 字号层级（rpx） ================= */
+$fs-3xl: 48rpx;   /* 详情页价格 */
+$fs-2xl: 40rpx;   /* 页面主标题、状态头 */
+$fs-xl: 34rpx;    /* 卡片书名、区块标题、列表价格 */
+$fs-lg: 30rpx;    /* 按钮文字、Tab 选中 */
+$fs-md: 28rpx;    /* 正文、表单输入 */
+$fs-base: 26rpx;  /* 次要正文、菜单项 */
+$fs-sm: 24rpx;    /* 辅助信息、次要价格 */
+$fs-xs: 22rpx;    /* 标签、角标 */
+
+/* ================= 间距（8rpx 栅格） ================= */
+$sp-1: 8rpx;
+$sp-2: 16rpx;
+$sp-3: 24rpx;   /* 页面左右边距 / 卡片内边距 */
+$sp-4: 32rpx;
+$sp-5: 40rpx;
+$sp-6: 48rpx;
+$sp-8: 64rpx;
+$sp-10: 80rpx;
+
+/* 固定语义间距 */
+$gap-page: 24rpx;    /* 页面左右边距 */
+$gap-card: 24rpx;    /* 卡片内边距 */
+$gap-item: 20rpx;    /* 卡片之间 */
+$gap-block: 32rpx;   /* 区块之间 */
+
+/* ================= 圆角 ================= */
+$radius-sm: 8rpx;     /* 封面、小标签 */
+$radius-md: 12rpx;    /* 输入框、图片 */
+$radius-lg: 20rpx;    /* 卡片（统一） */
+$radius-pill: 999rpx; /* 按钮、Chip、胶囊 */
+
+/* ================= 阴影 ================= */
+$shadow-card: 0 2rpx 12rpx rgba(31, 33, 38, 0.05);
+$shadow-card-hover: 0 8rpx 24rpx rgba(31, 33, 38, 0.1);
+$shadow-float: 0 -4rpx 20rpx rgba(31, 33, 38, 0.08);
+
+/* ================= 尺寸 ================= */
+$touch-min: 88rpx;      /* 最小触控区 44px */
+$btn-h: 88rpx;          /* 主按钮高 */
+$btn-h-sm: 72rpx;       /* 次按钮高 */
+$cover-row-w: 160rpx;   /* 行卡封面宽（3:4 开本比例） */
+$cover-row-h: 214rpx;
+$safe-bottom: env(safe-area-inset-bottom);
+
+/* ================= Mixin ================= */
+
+/* 卡片：白底 + 统一圆角 + 轻阴影 */
+@mixin card($radius: $radius-lg, $margin-bottom: $gap-item) {
+  background-color: $bg-card;
+  border-radius: $radius;
+  box-shadow: $shadow-card;
+  margin-bottom: $margin-bottom;
+}
+
+/* 固定底栏：白底 + 上阴影 + 安全区 */
+@mixin float-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: $bg-card;
+  box-shadow: $shadow-float;
+  padding: $sp-2 $gap-page;
+  padding-bottom: calc($sp-2 + $safe-bottom);
+  z-index: 20;
+}
+
+/* 主按钮：品牌底 + 全圆角 + 禁用态（用灰底而非降透明度，避免误认为可点） */
+@mixin btn-primary($height: $btn-h) {
+  height: $height;
+  min-width: 200rpx;
+  padding: 0 $sp-4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: $fs-lg;
+  font-weight: 600;
+  color: #ffffff;
+  background-color: $brand;
+  border-radius: $radius-pill;
+  transition: opacity 0.15s;
+
+  &:active {
+    opacity: 0.85;
+  }
+
+  &.disabled {
+    background-color: $border-strong;
+    color: #ffffff;
+  }
+}
+
+/* 描边按钮 */
+@mixin btn-outline($height: $btn-h-sm) {
+  height: $height;
+  min-width: 160rpx;
+  padding: 0 $sp-4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: $fs-md;
+  font-weight: 600;
+  color: $brand;
+  background-color: $bg-card;
+  border: 1rpx solid $brand;
+  border-radius: $radius-pill;
+
+  &:active {
+    opacity: 0.7;
+  }
+}
+
+/* 单行 / 两行截断 */
+@mixin ellipsis($lines: 1) {
+  @if $lines == 1 {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  } @else {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: $lines;
+    -webkit-box-orient: vertical;
+  }
+}
+
+/* 骨架呼吸动画块 */
+@mixin skeleton-block {
+  background-color: $bg-skeleton;
+  border-radius: $radius-sm;
+  animation: sk-breathe 1.2s ease-in-out infinite;
+}

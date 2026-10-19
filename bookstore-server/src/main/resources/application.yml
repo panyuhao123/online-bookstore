@@ -1,0 +1,162 @@
+# =====================================================================
+# 线上书店 APP 后端 —— 主配置文件
+# 约定：所有敏感信息（数据库口令、JWT 密钥）一律通过环境变量注入，
+#       本文件只写默认值占位，真实值写在 .env / 环境变量中，不提交代码库。
+# =====================================================================
+server:
+  # 注意：环境变量名统一加 BOOKSTORE_ 前缀，避免与运行环境自带的 SERVER_PORT 等变量冲突
+  port: ${BOOKSTORE_SERVER_PORT:8080}
+  # 优雅停机：收到停止信号后先处理完进行中的请求
+  shutdown: graceful
+
+spring:
+  profiles:
+    # 真实数据库口令在 application-local.yml（已被 .gitignore 忽略，不入库）。
+    # 设为默认 profile，避免忘记激活时以空口令连库（报 Access denied、业务接口 500）。
+    # 仍可用环境变量 SPRING_PROFILES_ACTIVE 覆盖。
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  application:
+    name: bookstore-server
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # 注意：Connector/J 8 不支持 characterEncoding=utf8mb4，必须写成 utf8（驱动会自动映射为 utf8mb4）
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/${DB_NAME:bookstore}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    hikari:
+      pool-name: BookstoreHikariPool
+      minimum-idle: 5
+      maximum-pool-size: 20
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  servlet:
+    multipart:
+      max-file-size: ${UPLOAD_MAX_FILE_SIZE:5MB}
+      max-request-size: ${UPLOAD_MAX_REQUEST_SIZE:10MB}
+  jackson:
+    default-property-inclusion: non_null
+    time-zone: Asia/Shanghai
+    date-format: yyyy-MM-dd HH:mm:ss
+
+# ---------------- MyBatis-Plus ----------------
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    # 开发环境打印 SQL，便于毕设答辩讲解与排错；上线可改为 stdout 关闭
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    db-config:
+      id-type: auto
+      # 本项目采用逻辑删除字段 status，不使用 MyBatis-Plus 内置逻辑删除
+  mapper-locations: classpath*:/mapper/**/*.xml
+
+# ---------------- Redis ----------------
+spring.data:
+  redis:
+    host: ${REDIS_HOST:127.0.0.1}
+    port: ${REDIS_PORT:6379}
+    # 超时设置得短一些：Redis 异常时能快速失败并降级到数据库。
+    # 缓存侧还有熔断兜底（连续失败后直接跳过缓存），因此这里的超时主要影响首个失败请求。
+    timeout: 800ms
+    connect-timeout: 500ms
+
+# ---------------- 业务自定义配置 ----------------
+bookstore:
+  jwt:
+    # 生产环境必须通过 JWT_SECRET 环境变量注入，且长度 >= 16
+    secret: ${JWT_SECRET:bookstore-app-dev-secret-please-change-in-production}
+    expire-hours: ${JWT_EXPIRE_HOURS:72}
+  upload:
+    base-dir: ${UPLOAD_BASE_DIR:./upload}
+    max-size-mb: ${UPLOAD_MAX_SIZE_MB:5}
+    access-prefix: /files
+  cors:
+    # 开发环境来源；uni-app 打包成 APP 后走原生请求，不受 CORS 限制
+    allowed-origins:
+      - ${CORS_ORIGIN_1:http://localhost:5173}
+      - ${CORS_ORIGIN_2:http://127.0.0.1:5173}
+  storage:
+    # 存储类型：local（本地磁盘，默认）/ minio（对象存储）
+    # 演示时 MinIO 未启动也不会影响服务：把这里改回 local 即可
+    type: ${STORAGE_TYPE:local}
+    minio:
+      endpoint: ${MINIO_ENDPOINT:http://127.0.0.1:9000}
+      access-key: ${MINIO_ACCESS_KEY:minioadmin}
+      secret-key: ${MINIO_SECRET_KEY:minioadmin}
+      bucket: ${MINIO_BUCKET:bookstore-cover}
+      # 对外访问地址；留空则用 endpoint。
+      # 真机联调注意：手机访问不到 127.0.0.1，必须填写电脑的局域网 IP，
+      # 例如 http://192.168.1.5:9000
+      public-base-url: ${MINIO_PUBLIC_BASE_URL:}
+  cache:
+    # 缓存开关与有效期；关闭后缓存注解自动变成空操作
+    enabled: ${CACHE_ENABLED:true}
+    ttl-minutes: ${CACHE_TTL_MINUTES:30}
+    key-prefix: "bookstore:"
+  order:
+    # 待支付订单超时时长（分钟）：超过该时长仍未支付，由定时任务自动取消并回补库存
+    timeout-minutes: ${ORDER_TIMEOUT_MINUTES:30}
+    # 定时任务总开关；设为 false 后调度器不启动，@Scheduled 不注册
+    auto-cancel-enabled: ${ORDER_AUTO_CANCEL_ENABLED:true}
+    # 扫描周期（cron）。默认每 5 分钟一次；答辩演示若不希望等，
+    # 可改成 "0 * * * * ?"（每分钟），或直接调管理端 POST /api/admin/order/cancel-timeout 立即执行
+    auto-cancel-cron: "${ORDER_AUTO_CANCEL_CRON:0 */5 * * * ?}"
+    # 单次最多处理订单数，给批量操作封顶，避免积压过多时开一个超长事务
+    auto-cancel-batch-size: ${ORDER_AUTO_CANCEL_BATCH_SIZE:200}
+  pay:
+    # 支付渠道：mock-模拟支付（默认，零外部依赖，答辩演示最稳）/ alipay-支付宝沙箱
+    type: ${PAY_TYPE:mock}
+    mock:
+      # 模拟支付的人为延迟（毫秒），设几百毫秒可让前端「支付中」的 loading 更真实
+      delay-millis: ${PAY_MOCK_DELAY_MILLIS:0}
+    alipay:
+      # 以下凭证必须通过环境变量注入，不得写进代码库。
+      # 获取方式：支付宝开放平台 → 沙箱环境 → 应用信息 / 密钥管理
+      app-id: ${ALIPAY_APP_ID:}
+      private-key: ${ALIPAY_PRIVATE_KEY:}
+      alipay-public-key: ${ALIPAY_PUBLIC_KEY:}
+      gateway-url: ${ALIPAY_GATEWAY_URL:https://openapi-sandbox.dl.alipaydev.com/gateway.do}
+      # 异步通知地址必须公网可达；本地调试需内网穿透（如 ngrok）
+      notify-url: ${ALIPAY_NOTIFY_URL:}
+      # 支付完成后浏览器跳回的地址（本项目为 APP，留空即可）
+      return-url: ${ALIPAY_RETURN_URL:}
+      sign-type: RSA2
+      timeout-minutes: ${ALIPAY_TIMEOUT_MINUTES:30}
+
+# ---------------- 日志 ----------------
+logging:
+  level:
+    root: INFO
+    cn.edu.bookstore: DEBUG
+  pattern:
+    # %X{requestId} 输出链路 ID，与响应头 X-Request-Id 一致
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{requestId}] %logger{40} - %msg%n"
+
+# ---------------- 接口文档（Knife4j / OpenAPI 3） ----------------
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    # 按接口路径字母序排列，文档页面更容易查找
+    tags-sorter: alpha
+    operations-sorter: alpha
+
+knife4j:
+  # 增强模式：开启后 /doc.html 提供搜索、调试、离线文档导出等功能
+  enable: true
+  setting:
+    language: zh_cn
+
+# ---------------- 监控端点 ----------------
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always

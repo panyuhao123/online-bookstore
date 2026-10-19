@@ -1,0 +1,150 @@
+{
+  "pages": [
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "线上书店"
+      }
+    },
+    {
+      "path": "pages/category/category",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "分类"
+      }
+    },
+    {
+      "path": "pages/book/list",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "图书列表"
+      }
+    },
+    {
+      "path": "pages/cart/cart",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "购物车"
+      }
+    },
+    {
+      "path": "pages/mine/mine",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "我的"
+      }
+    },
+    {
+      "path": "pages/book/detail",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "图书详情"
+      }
+    },
+    {
+      "path": "pages/book/new",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "新书上架"
+      }
+    },
+    {
+      "path": "pages/book/cheap",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "低价优选"
+      }
+    },
+    {
+      "path": "pages/booklist/list",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "书单"
+      }
+    },
+    {
+      "path": "pages/booklist/detail",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "书单详情"
+      }
+    },
+    {
+      "path": "pages/login/login",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "登录"
+      }
+    },
+    {
+      "path": "pages/login/register",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "注册"
+      }
+    },
+    {
+      "path": "pages/address/list",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "收货地址"
+      }
+    },
+    {
+      "path": "pages/address/edit",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "新增地址"
+      }
+    },
+    {
+      "path": "pages/order/confirm",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "确认订单"
+      }
+    },
+    {
+      "path": "pages/order/list",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "我的订单"
+      }
+    },
+    {
+      "path": "pages/order/detail",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "订单详情"
+      }
+    },
+    {
+      "path": "pages/mine/server",
+      "style": {
+        "navigationBarTitleText": "调试设置"
+      }
+    },
+    {
+      "path": "pages/review/list",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "用户评价"
+      }
+    },
+    {
+      "path": "pages/review/edit",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "发表评价"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "线上书店",
+    "navigationBarBackgroundColor": "#FFFFFF",
+    "backgroundColor": "#F4F5F7",
+    "onReachBottomDistance": 60
+  }
+}

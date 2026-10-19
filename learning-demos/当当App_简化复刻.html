@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>当当 App 首页 · 简化复刻（学习用）</title>
+<style>
+/* ============================================================
+   设计变量：统一管理颜色/圆角/间距，体现设计 Token 思路
+   当当视觉特征：白底 + 大红 (#E42112) 行动色 + 价格强红
+   ============================================================ */
+:root {
+  --c-primary: #e42112;        /* 品牌红：导航选中、价格、按钮 */
+  --c-primary-deep: #c01d0f;   /* 按钮按压态深红 */
+  --c-text-main: #1f2126;      /* 主文字 */
+  --c-text-sub: #7a7f87;       /* 次要文字 */
+  --c-text-price: #e42112;     /* 价格（与品牌红一致，当当惯例） */
+  --c-bg: #f4f5f7;             /* 页面底色 */
+  --c-card: #ffffff;           /* 卡片底 */
+  --c-line: #ededf0;           /* 分割线 */
+  --c-tag-hot: #ff6b2b;        /* HOT 角标橙 */
+  --radius-card: 12px;
+  --radius-btn: 14px;
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px;
+  --sp-4: 16px; --sp-5: 20px;
+  --tabbar-h: 56px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  background: #e9eaee;               /* 视口外围灰，突出手机屏 */
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: var(--c-text-main);
+}
+
+/* 手机视口容器：以 390px 宽模拟移动端，居中呈现 */
+.phone {
+  max-width: 390px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: var(--c-bg);
+  position: relative;
+  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+}
+
+/* ============================================================
+   模块一：顶部搜索导航区（吸顶）
+   结构：左 logo位 + 搜索框 + 扫一扫/消息 图标
+   ============================================================ */
+.top-bar {
+  position: sticky; top: 0; z-index: 100;
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--c-card);
+}
+.search-box {
+  flex: 1;
+  display: flex; align-items: center; gap: var(--sp-2);
+  height: 34px;
+  padding: 0 var(--sp-3);
+  background: var(--c-bg);
+  border: 1px solid var(--c-primary);   /* 当当搜索框特征：红色描边 */
+  border-radius: 17px;
+  color: var(--c-text-sub);
+  font-size: 14px;
+}
+.icon-btn {
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+}
+
+/* ============================================================
+   模块二：频道导航 Tab（横向滚动，选中项红字+红底线）
+   ============================================================ */
+.channel-tabs {
+  position: sticky; top: 50px; z-index: 99;
+  display: flex; gap: var(--sp-5);
+  padding: 0 var(--sp-4);
+  background: var(--c-card);
+  overflow-x: auto;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--c-line);
+  scrollbar-width: none;
+}
+.channel-tabs::-webkit-scrollbar { display: none; }
+.channel-tab {
+  padding: 10px 0;
+  font-size: 15px;
+  color: var(--c-text-main);
+  border-bottom: 2px solid transparent;
+  flex-shrink: 0;
+}
+.channel-tab.active {
+  color: var(--c-primary);
+  font-weight: 600;
+  border-bottom-color: var(--c-primary);
+}
+
+/* ============================================================
+   模块三：运营 Banner 轮播区（渐变占位图 + 文案）
+   ============================================================ */
+.banner {
+  margin: var(--sp-3) var(--sp-4) 0;
+  height: 120px;
+  border-radius: var(--radius-card);
+  background: linear-gradient(120deg, #ff8a4c 0%, #e42112 55%, #b3130a 100%);
+  color: #fff;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 0 var(--sp-5);
+  position: relative;
+  overflow: hidden;
+}
+.banner .banner-title { font-size: 22px; font-weight: 700; letter-spacing: 1px; }
+.banner .banner-sub {
+  margin-top: 6px;
+  font-size: 13px;
+  opacity: .92;
+}
+.banner .banner-badge {
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  background: rgba(255,255,255,.22);
+  border-radius: 50%;
+  width: 72px; height: 72px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px;
+}
+/* 轮播指示点 */
+.banner-dots {
+  position: absolute; bottom: 8px; left: 0; right: 0;
+  display: flex; justify-content: center; gap: 5px;
+}
+.banner-dots i {
+  width: 6px; height: 6px; border-radius: 3px;
+  background: rgba(255,255,255,.5);
+}
+.banner-dots i.on { background: #fff; width: 14px; }
+
+/* ============================================================
+   模块四：功能入口宫格（签到/领券/榜单/限时抢，4 列）
+   ============================================================ */
+.quick-entry {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-2);
+  margin: var(--sp-3) var(--sp-4) 0;
+  padding: var(--sp-4) var(--sp-2);
+  background: var(--c-card);
+  border-radius: var(--radius-card);
+}
+.entry-item { text-align: center; }
+.entry-icon {
+  width: 44px; height: 44px;
+  margin: 0 auto var(--sp-1);
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+}
+.entry-item p { font-size: 12px; color: var(--c-text-main); }
+
+/* ============================================================
+   模块五：楼层标题（左侧红竖条 + 标题 + 右侧"更多"）
+   ============================================================ */
+.floor-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin: var(--sp-5) var(--sp-4) var(--sp-3);
+}
+.floor-head h2 {
+  font-size: 17px;
+  display: flex; align-items: center; gap: 8px;
+}
+.floor-head h2::before {          /* 红色竖条装饰 */
+  content: "";
+  width: 4px; height: 16px;
+  background: var(--c-primary);
+  border-radius: 2px;
+}
+.floor-head .more { font-size: 12px; color: var(--c-text-sub); }
+
+/* ============================================================
+   模块六：商品卡片列表（双列瀑布流式网格）
+   卡片结构：封面占位图 → 书名 → 副标题 → 价格行 + 加购按钮
+   ============================================================ */
+.book-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;   /* 双列 */
+  gap: var(--sp-3);
+  margin: 0 var(--sp-4);
+}
+.book-card {
+  background: var(--c-card);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+/* 封面：渐变占位（真实项目替换为 <img>） */
+.book-cover {
+  height: 170px;
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(255,255,255,.9);
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  padding: 0 16px;
+  line-height: 1.5;
+}
+/* 三种占位渐变，模拟不同封面色调 */
+.cover-a { background: linear-gradient(135deg, #4a67d6, #2c3e8f); }
+.cover-b { background: linear-gradient(135deg, #e42112, #8f1d14); }
+.cover-c { background: linear-gradient(135deg, #1fa27a, #0d5c46); }
+.book-info { padding: var(--sp-3); }
+.book-name {
+  font-size: 14px;
+  line-height: 1.45;
+  /* 两行截断：保持卡片等高 */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 40px;
+}
+.book-desc {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--c-text-sub);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.book-bottom {
+  margin-top: var(--sp-2);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.book-price { color: var(--c-text-price); font-weight: 700; }
+.book-price .rmb { font-size: 12px; }
+.book-price .num { font-size: 18px; }
+.btn-cart {
+  border: none;
+  background: var(--c-primary);
+  color: #fff;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: var(--radius-btn);
+}
+.btn-cart:active { background: var(--c-primary-deep); }
+/* HOT 角标：绝对定位于卡片左上角 */
+.tag-hot {
+  position: absolute; top: 0; left: 0;
+  background: var(--c-tag-hot);
+  color: #fff;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 0 0 10px 0;
+}
+.book-card { position: relative; }
+
+/* ============================================================
+   模块七：底部 Tab 栏（固定，5 个入口，选中红色）
+   ============================================================ */
+.tab-bar {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 390px;
+  height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--c-card);
+  border-top: 1px solid var(--c-line);
+  display: flex;
+  z-index: 200;
+}
+.tab-item {
+  flex: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 2px;
+  font-size: 11px;
+  color: var(--c-text-sub);
+}
+.tab-item .tab-icon { font-size: 22px; }
+.tab-item.active { color: var(--c-primary); }
+
+/* 楼层间距收尾 */
+.grid-floor { padding-bottom: var(--sp-4); }
+</style>
+</head>
+<body>
+
+<div class="phone">
+
+  <!-- ========== 模块一：顶部搜索导航区 ========== -->
+  <header class="top-bar">
+    <div class="icon-btn">📖</div>
+    <div class="search-box">
+      <span>🔍</span>
+      <span>怪谈漫画课本里的文学家</span>
+    </div>
+    <div class="icon-btn">📷</div>
+    <div class="icon-btn">💬</div>
+  </header>
+
+  <!-- ========== 模块二：频道导航 Tab（首页/图书/课程…） ========== -->
+  <nav class="channel-tabs" id="channelTabs">
+    <div class="channel-tab active">首页</div>
+    <div class="channel-tab">图书</div>
+    <div class="channel-tab">课程</div>
+    <div class="channel-tab">特装书</div>
+    <div class="channel-tab">亲签书</div>
+    <div class="channel-tab">童书</div>
+    <div class="channel-tab">电子书</div>
+  </nav>
+
+  <!-- ========== 模块三：运营 Banner 轮播区 ========== -->
+  <section class="banner" aria-label="运营活动位">
+    <div class="banner-title">2026抢先看</div>
+    <div class="banner-sub">新书日历 · 每月值得期待的好书</div>
+    <div class="banner-badge">📚</div>
+    <div class="banner-dots"><i class="on"></i><i></i><i></i></div>
+  </section>
+
+  <!-- ========== 模块四：功能入口宫格 ========== -->
+  <section class="quick-entry" aria-label="功能区入口">
+    <div class="entry-item"><div class="entry-icon" style="background:#fff1e8">📅</div><p>签到</p></div>
+    <div class="entry-item"><div class="entry-icon" style="background:#ffeef0">🎟️</div><p>领券</p></div>
+    <div class="entry-item"><div class="entry-icon" style="background:#eef4ff">🏆</div><p>榜单</p></div>
+    <div class="entry-item"><div class="entry-icon" style="background:#eafff3">⚡</div><p>限时抢</p></div>
+  </section>
+
+  <!-- ========== 模块五 + 六：楼层标题 + 商品双列卡片列表 ========== -->
+  <section class="grid-floor">
+    <div class="floor-head">
+      <h2>为您推荐</h2>
+      <span class="more">更多 ›</span>
+    </div>
+
+    <div class="book-grid">
+      <!-- 商品卡 × 6：占位数据，结构与真实项目一致 -->
+      <article class="book-card">
+        <span class="tag-hot">HOT</span>
+        <div class="book-cover cover-a">西游记<br>人民教育出版社</div>
+        <div class="book-info">
+          <h3 class="book-name">西游记（全二册）九年级下册推荐阅读 名家经典</h3>
+          <p class="book-desc">人民教育出版社</p>
+          <div class="book-bottom">
+            <div class="book-price"><span class="rmb">¥</span><span class="num">9.50</span></div>
+            <button class="btn-cart">加购</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="book-card">
+        <div class="book-cover cover-b">红楼梦<br>快乐读书吧指定</div>
+        <div class="book-info">
+          <h3 class="book-name">红楼梦 八年级必读课外阅读名著 正版原著</h3>
+          <p class="book-desc">人民文学出版社</p>
+          <div class="book-bottom">
+            <div class="book-price"><span class="rmb">¥</span><span class="num">38.40</span></div>
+            <button class="btn-cart">加购</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="book-card">
+        <div class="book-cover cover-c">世界历史<br>新编九下历史</div>
+        <div class="book-info">
+          <h3 class="book-name">2027新版三世界历史九年级下册人教版同步解读</h3>
+          <p class="book-desc">商务印书馆</p>
+          <div class="book-bottom">
+            <div class="book-price"><span class="rmb">¥</span><span class="num">25.58</span></div>
+            <button class="btn-cart">加购</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="book-card">
+        <span class="tag-hot">HOT</span>
+        <div class="book-cover cover-b">加密货币<br>与金融</div>
+        <div class="book-info">
+          <h3 class="book-name">加密货币与金融：财富全球金融体系通俗读物</h3>
+          <p class="book-desc">中信出版社</p>
+          <div class="book-bottom">
+            <div class="book-price"><span class="rmb">¥</span><span class="num">22.80</span></div>
+            <button class="btn-cart">加购</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="book-card">
+        <div class="book-cover cover-a">剪映真传<br>新手速成</div>
+        <div class="book-info">
+          <h3 class="book-name">剪映官方 天天消消视剪辑教程 零基础短视频创作</h3>
+          <p class="book-desc">人民邮电出版社</p>
+          <div class="book-bottom">
+            <div class="book-price"><span class="rmb">¥</span><span class="num">56.60</span></div>
+            <button class="btn-cart">加购</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="book-card">
+        <div class="book-cover cover-c">毛泽东选集<br>精装典藏</div>
+        <div class="book-info">
+          <h3 class="book-name">毛泽东选集 全四册 精装典藏版 经典著作</h3>
+          <p class="book-desc">人民出版社</p>
+          <div class="book-bottom">
+            <div class="book-price"><span class="rmb">¥</span><span class="num">14.30</span></div>
+            <button class="btn-cart">加购</button>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ========== 模块七：底部 Tab 栏 ========== -->
+  <nav class="tab-bar" aria-label="主导航">
+    <div class="tab-item active"><span class="tab-icon">🏠</span>首页</div>
+    <div class="tab-item"><span class="tab-icon">🗂️</span>分类</div>
+    <div class="tab-item"><span class="tab-icon">📖</span>当读</div>
+    <div class="tab-item"><span class="tab-icon">🛒</span>购物车</div>
+    <div class="tab-item"><span class="tab-icon">👤</span>我的</div>
+  </nav>
+
+</div>
+
+<script>
+/* 轻交互：频道 Tab 点击切换选中态（学习演示用，无业务逻辑） */
+document.getElementById('channelTabs').addEventListener('click', (e) => {
+  const tab = e.target.closest('.channel-tab');
+  if (!tab) return;
+  document.querySelectorAll('.channel-tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+});
+</script>
+
+</body>
+</html>

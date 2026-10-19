@@ -1,0 +1,163 @@
+/* ============================================================
+   Web 端宽屏（≥ 960px）桌面布局
+   ------------------------------------------------------------
+   集中放「跨页面 / 跨组件」的响应式覆盖，避免同一条媒体查询散落到 19 个页面。
+
+   为什么用 !important：
+     各页的 .tabbar-holder / .sort-bar / .float-bar 都写在页面的 scoped 块里，
+     编译后带 [data-v-xxx] 属性选择器，特异性高于本文件的全局规则；
+     不加 !important 会被页面样式盖掉（这是本项目的既有样式组织方式决定的）。
+
+   为什么不动 rpx 改 px：
+     视口 ≥ 960 时 uni-app 把 rpx 固定按 375 基准折算（1rpx = 0.5px），
+     数值不会失控放大，但也就意味着桌面下的间距/字号会偏小，
+     所以本文件只对「布局骨架」（容器宽度、列数、固定元素留白）做覆盖，
+     字号仍沿用 Token，保证与 APP 视觉一致。
+
+   桌面版式与移动端的分工：
+     移动端 = APP 原样（单列 / 双列卡片流 + 底部 tabBar）；
+     桌面 = PC 书城版式（两段式顶栏 + 多列栅格 + 楼层 + 页脚）。
+     两者共用同一份页面代码，靠 @media 切两套形态，不复制页面。
+   ============================================================ */
+
+$web-max: 1200px;   /* 主内容区最大宽，与 web-header 的 .wh-inner 保持一致 */
+$web-pad: 24px;     /* 主内容区左右内边距 */
+
+/* 固定元素的内容对齐：与 .page 的居中区域对齐。
+   用 max() 兜底，避免视口略小于 1200 时算出负 padding。 */
+$web-gutter: max(#{$web-pad}, calc((100% - #{$web-max}) / 2 + #{$web-pad}));
+
+/* 桌面顶栏总高度。
+   web-header 的真实高度、page-nav 的下移距离、页面自挂顶栏的占位高度
+   三处都引用这个变量，避免硬编码不同步（改顶栏高度时只改这里，
+   并同步 common/web.js 的 WEB_HEADER_H）。 */
+:root {
+  --web-header-h: 112px;
+}
+
+/* 页面自挂 web-header 时的占位高度 */
+.web-header-holder {
+  height: var(--web-header-h);
+}
+
+@media (min-width: 960px) {
+  /* 始终为纵向滚动条预留等宽轨道：文档滚动页与内部滚动页（分类页）
+     的可用视口宽度保持一致，1200 居中容器左右边距才不会出现 7px 错位。 */
+  html {
+    scrollbar-gutter: stable;
+  }
+
+  /* ---- 主容器：通栏改居中 ---- */
+  .page {
+    max-width: $web-max;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* ---- 底部 tabBar 在桌面由顶栏接管，占位只留呼吸位 ---- */
+  .tabbar-holder {
+    height: 32px !important;
+  }
+
+  /* 图书栅格（.grid-books/.grid-cell）的列数与列宽一律由各页面自己的
+     ≥960 块声明（display:grid + repeat(n,minmax(0,1fr)) + cell width:100%）。
+     这里不再做全局覆盖：早期容器是 flex，全局按 flex 思路写的
+     calc((100%-gap)/n) 宽度套到 grid item 上会把卡片压成窄竖条。 */
+
+  /* ---- 固定底栏 / 吸顶排序条：白条通栏，内容随主容器居中 ----
+     不用 left:50% + transform：页面切换动画会给祖先加 transform，
+     一旦祖先有 transform，fixed 的定位基准就变成该祖先而不是视口。 */
+  .float-bar {
+    padding-left: $web-gutter !important;
+    padding-right: $web-gutter !important;
+    padding-bottom: 16px !important;
+  }
+
+  .sort-bar {
+    padding-left: $web-gutter !important;
+    padding-right: $web-gutter !important;
+  }
+}
+
+/* ============================================================
+   桌面指针交互增强
+   ------------------------------------------------------------
+   为什么必须单独补 :hover：
+     uni-app 的 hover-class 走 touchstart / touchend 事件，鼠标悬停不会触发，
+     键盘也不会触发。所以「按压反馈」在触屏上有效，桌面上完全没有任何
+     「这个元素可点」的提示——光标形态和悬停态都得靠原生 CSS 补。
+
+   为什么要判 (hover: hover) and (pointer: fine)：
+     触屏设备（含部分笔记本触摸屏）会在 :hover 上出现「点一下之后悬停态粘住」，
+     用媒体查询限定真正的鼠标设备可以避免。APP 端不受影响（非 H5 不编译本文件）。
+   ============================================================ */
+@media (hover: hover) and (pointer: fine) {
+  /* ---- 指针形态：告诉用户「这里能点」 ---- */
+  .book-card,
+  .btn-primary,
+  .btn-outline,
+  .btn-text,
+  .chip,
+  .state-btn {
+    cursor: pointer;
+  }
+
+  /* ---- 图书卡片：轻微抬升 + 阴影 + 描边转品牌色，与按压态（hover-dim）区分开 ---- */
+  .book-card {
+    transition: box-shadow 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+  }
+
+  .book-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(31, 33, 38, 0.12);
+    border-color: $brand;
+  }
+
+  /* ---- 按钮：加深而非变淡，避免看起来像被禁用 ---- */
+  .btn-primary:hover {
+    background-color: $brand-dark;
+  }
+
+  .btn-primary.disabled:hover {
+    background-color: $border-strong;
+    cursor: not-allowed;
+  }
+
+  .btn-outline:hover {
+    background-color: $brand-weak;
+  }
+
+  .btn-text:hover {
+    background-color: $brand-weak;
+  }
+
+  /* ---- 筛选胶囊 / 空态按钮：底色加深 ---- */
+  .chip:hover {
+    background-color: $border-color;
+  }
+
+  .state-btn:hover {
+    background-color: $brand-weak;
+  }
+}
+
+/* ============================================================
+   键盘可达性
+   ------------------------------------------------------------
+   桌面可以用 Tab 在输入框之间切换，uni-app 的 hover-class 不响应键盘，
+   没有焦点环时用户完全看不出光标在哪。这里只给真正的表单元素加焦点环，
+   不给 view 加（它们没有 tabindex，加了也不生效，反而污染样式）。
+   ============================================================ */
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid $brand;
+  outline-offset: 1px;
+}
+
+@media (min-width: 960px) {
+  /* ---- 空态 / 加载态：桌面下给足高度，避免贴着顶栏显示 ---- */
+  .state-box {
+    min-height: 360px;
+    justify-content: center;
+  }
+}

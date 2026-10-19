@@ -1,0 +1,28 @@
+# ===== 敏感配置 =====
+.env
+*.local.yml
+
+# ===== 后端 =====
+target/
+!.mvn/wrapper/maven-wrapper.jar
+*.log
+upload/
+
+# ===== 前端（uni-app / Vue） =====
+node_modules/
+dist/
+.hbuilderx/
+unpackage/
+.hbuilderx
+
+# ===== 编辑器与系统 =====
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+
+# ===== 工具状态 =====
+.workbuddy/
+nul

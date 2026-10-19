@@ -1,0 +1,24 @@
+{
+  "name": "bookstore-admin",
+  "version": "1.0.0",
+  "private": true,
+  "description": "线上书店 APP 的 Web 管理后台（Vue3 + Vite + Element Plus）",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.1",
+    "axios": "^1.7.7",
+    "echarts": "^6.1.0",
+    "element-plus": "^2.8.4",
+    "vue": "^3.5.12",
+    "vue-router": "^4.4.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.1.4",
+    "vite": "^5.4.10"
+  }
+}

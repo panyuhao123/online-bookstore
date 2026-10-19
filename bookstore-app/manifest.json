@@ -1,0 +1,52 @@
+{
+    "name" : "线上书店",
+    "appid" : "__UNI__9C0C96D",
+    "description" : "本科毕业设计——线上书店 APP",
+    "versionName" : "1.0.0",
+    "versionCode" : "100",
+    "transformPx" : false,
+    "vueVersion" : "3",
+    "locale" : "zh-Hans",
+    "networkTimeout" : {
+        "request" : 15000,
+        "connectSocket" : 15000,
+        "uploadFile" : 60000,
+        "downloadFile" : 60000
+    },
+    "app-plus" : {
+        "usingComponents" : true,
+        "nvueStyleCompiler" : "uni-app",
+        "compilerVersion" : 3,
+        "splashscreen" : {
+            "alwaysShowBeforeRender" : true,
+            "autoclose" : true,
+            "waiting" : true
+        },
+        "modules" : {},
+        "distribute" : {
+            "android" : {
+                "usesCleartextTraffic" : true,
+                "permissions" : [
+                    "<uses-permission android:name=\"android.permission.INTERNET\"/>",
+                    "<uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\"/>",
+                    "<uses-permission android:name=\"android.permission.ACCESS_WIFI_STATE\"/>"
+                ]
+            },
+            "ios" : {
+                "dSYMs" : false
+            },
+            "sdkConfigs" : {}
+        }
+    },
+    "h5" : {
+        "title" : "线上书店",
+        "router" : {
+            "mode" : "hash",
+            "base" : "/"
+        },
+        "devServer" : {
+            "https" : false,
+            "port" : 5176
+        }
+    }
+}

@@ -10,9 +10,11 @@ const compilerDom = require('D:/workbuddy123/线上书店/bookstore-admin/node_m
 
 const APP = 'D:/workbuddy123/线上书店/bookstore-app';
 const NODE = 'C:/Users/86138/.workbuddy/binaries/node/versions/22.22.2-6/node.exe';
-const TMP = 'D:/tmp/sfcchk';
+// 中转文件放在 tools/.tmp（已进 .gitignore），不再写到 D:/tmp 这类仓库外目录。
+// 也不再「先整目录 rmSync 再重建」：在受限环境下批量删除会触发安全护栏而整体失败，
+// 而这里只需要一个能覆写同名中转文件的落脚点，留着旧文件无害。
+const TMP = path.join(__dirname, '.tmp', 'sfcchk');
 
-fs.rmSync(TMP, { recursive: true, force: true });
 fs.mkdirSync(TMP, { recursive: true });
 
 function walk(dir, out = []) {

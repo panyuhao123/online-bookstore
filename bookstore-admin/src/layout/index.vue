@@ -66,6 +66,7 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getAdmin, clearToken, getBaseUrl } from '@/utils/auth'
+import { logout } from '@/api/admin'
 
 const route = useRoute()
 const router = useRouter()
@@ -82,7 +83,15 @@ function handleLogout() {
     confirmButtonText: '退出',
     cancelButtonText: '取消'
   })
-    .then(() => {
+    .then(async () => {
+      // 先在服务端吊销令牌（让这枚令牌立即失效），再清本地登录态。
+      // 接口本身幂等，失败也不该拦住退出动作 —— 清本地令牌至少能保证本机登出，
+      // 因此这里 catch 掉异常，与 APP 端「silent 退出」的处理方式保持一致。
+      try {
+        await logout()
+      } catch (e) {
+        // 忽略：网络异常/令牌已失效时仍继续清理本地登录态
+      }
       clearToken()
       ElMessage.success('已退出登录')
       router.replace('/login')

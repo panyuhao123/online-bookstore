@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useCartStore } from '@/stores/cart'
+import { saveRedirect } from '@/utils/storage'
 import { ElMessageBox } from 'element-plus'
 
 const router = useRouter()
@@ -24,7 +25,7 @@ function onSearch() {
 }
 
 function goLogin() {
-  localStorage.setItem('bookstore_web_redirect', route.fullPath)
+  saveRedirect(route.fullPath)
   router.push('/login')
 }
 

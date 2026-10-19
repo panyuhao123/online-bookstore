@@ -2,12 +2,10 @@
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { useCartStore } from '@/stores/cart'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
 const userStore = useUserStore()
-const cartStore = useCartStore()
 
 const formRef = ref(null)
 const loading = ref(false)
@@ -45,24 +43,25 @@ const rules = {
 
 async function onSubmit() {
   if (!formRef.value) return
-  await formRef.value.validate(async (valid) => {
-    if (!valid) return
-    loading.value = true
-    try {
-      await userStore.register({
-        phone: form.phone,
-        password: form.password,
-        nickname: form.nickname || undefined
-      })
-      ElMessage.success('注册成功，已自动登录')
-      await cartStore.fetchCart().catch(() => {})
-      router.push('/')
-    } catch (e) {
-      /* 错误已在拦截器提示 */
-    } finally {
-      loading.value = false
-    }
-  })
+  // 不传回调：回调 + Promise 混用时校验失败会产生未处理的 rejection
+  const valid = await formRef.value.validate().catch(() => false)
+  if (!valid) return
+
+  loading.value = true
+  try {
+    await userStore.register({
+      phone: form.phone,
+      password: form.password,
+      nickname: form.nickname || undefined
+    })
+    // 登录接口需要图形验证码，无法在这里静默登录，跳到登录页并带上手机号
+    ElMessage.success('注册成功，请使用该账号登录')
+    router.push({ path: '/login', query: { phone: form.phone } })
+  } catch (e) {
+    /* 错误已在拦截器提示 */
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 

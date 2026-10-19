@@ -1,19 +1,16 @@
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { pageBooks } from '@/api/book'
 import { getCategories } from '@/api/category'
 import { useBooklistStore } from '@/stores/booklist'
-import { useCartStore } from '@/stores/cart'
-import { useUserStore } from '@/stores/user'
+import { addBatchToCartGuarded } from '@/utils/cart-action'
 import { formatPrice, formatRating } from '@/utils/format'
 import { bookCover, placeholderCover } from '@/utils/image'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()
 const booklistStore = useBooklistStore()
-const cartStore = useCartStore()
-const userStore = useUserStore()
 
 const categories = ref([])
 const results = ref([])
@@ -43,9 +40,8 @@ async function loadCategories() {
   }
 }
 
-async function search() {
+async function doSearch() {
   loading.value = true
-  pageNum.value = 1
   try {
     const params = {
       keyword: filters.keyword || undefined,
@@ -67,37 +63,41 @@ async function search() {
   }
 }
 
+/**
+ * 提交检索：条件变了必须回到第 1 页。
+ *
+ * <p>此前 `search()` 自己把 `pageNum` 重置成 1，而分页器又直接绑到 `search`，
+ * 于是点第 2 页 → 页码先被重置为 1 再请求 → 永远翻不动。拆成两个入口就对了。
+ */
+function submitSearch() {
+  pageNum.value = 1
+  doSearch()
+}
+
+/** 翻页：保留分页器已设好的页码 */
+function handlePageChange() {
+  doSearch()
+}
+
 function reset() {
   Object.assign(filters, {
     keyword: '', categoryId: null, minPrice: null, maxPrice: null,
     author: '', publisher: '', publishYear: null, minRating: null
   })
-  search()
+  submitSearch()
 }
+
+/** 作者 / 出版社 / 评分是后端不支持的筛选维度，只能对当前页结果做本地过滤 */
+const hasPageLocalFilter = computed(
+  () => !!(filters.author || filters.publisher || filters.minRating)
+)
 
 function handleSelectionChange(rows) {
   selectedBooks.value = rows
 }
 
-async function batchAddToCart() {
-  if (selectedBooks.value.length === 0) {
-    ElMessage.warning('请先选择图书')
-    return
-  }
-  if (!userStore.isLogin) {
-    ElMessage.warning('请先登录')
-    router.push('/login')
-    return
-  }
-  try {
-    await ElMessageBox.confirm(`确认将选中的 ${selectedBooks.value.length} 本图书加入购物车？`, '提示')
-    for (const b of selectedBooks.value) {
-      if (b.stock > 0) await cartStore.add(b.id, 1)
-    }
-    ElMessage.success('已加入购物车')
-  } catch (e) {
-    /* 取消 */
-  }
+function batchAddToCart() {
+  return addBatchToCartGuarded(selectedBooks.value, { router })
 }
 
 async function saveToBooklist() {
@@ -125,7 +125,7 @@ function goDetail(id) {
 
 onMounted(() => {
   loadCategories()
-  search()
+  submitSearch()
 })
 </script>
 
@@ -179,7 +179,7 @@ onMounted(() => {
             </el-form-item>
           </div>
           <div class="filter-actions">
-            <el-button type="primary" @click="search">
+            <el-button type="primary" @click="submitSearch">
               <el-icon><Search /></el-icon> 检索
             </el-button>
             <el-button @click="reset">重置</el-button>
@@ -190,7 +190,18 @@ onMounted(() => {
 
     <!-- 结果操作栏 -->
     <div class="result-toolbar card">
-      <span>共找到 <b>{{ total }}</b> 本图书</span>
+      <span>
+        共找到 <b>{{ total }}</b> 本图书
+        <el-tooltip
+          v-if="hasPageLocalFilter"
+          content="作者 / 出版社 / 评分由后端接口不支持，此处只在当前页结果内过滤"
+          placement="top"
+        >
+          <el-tag size="small" type="warning" effect="plain" class="local-filter-tag">
+            本页内筛选
+          </el-tag>
+        </el-tooltip>
+      </span>
       <div class="result-tool-right">
         <span class="selected-count" v-if="selectedBooks.length > 0">已选 <b>{{ selectedBooks.length }}</b> 本</span>
         <el-button type="primary" size="small" @click="batchAddToCart" :disabled="selectedBooks.length === 0">
@@ -241,7 +252,7 @@ onMounted(() => {
           :total="total"
           layout="prev, pager, next, total"
           background
-          @current-change="search"
+          @current-change="handlePageChange"
         />
       </div>
 
@@ -333,6 +344,10 @@ onMounted(() => {
 .selected-count {
   font-size: 13px;
   color: var(--text-sub);
+}
+
+.local-filter-tag {
+  margin-left: 6px;
 }
 
 .selected-count b {

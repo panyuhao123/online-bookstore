@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useBooklistStore } from '@/stores/booklist'
 import { useUserStore } from '@/stores/user'
+import { OFFICIAL_BOOKLISTS } from '@/data/official-booklists'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()
@@ -11,13 +12,10 @@ const userStore = useUserStore()
 
 const activeTab = ref('official') // official | mine
 
-// 官方书单（固定展示）
-const officialLists = ref([
-  { id: 'official-1', name: '计算机经典必读', description: '程序员成长路上绕不开的经典著作', bookCount: 12 },
-  { id: 'official-2', name: '畅销小说精选', description: '口碑与销量双丰收的当代小说', bookCount: 10 },
-  { id: 'official-3', name: '人文社科通识', description: '拓宽视野的人文社科入门书单', bookCount: 8 },
-  { id: 'official-4', name: '心理学入门', description: '认识自己、理解他人的必读书目', bookCount: 9 }
-])
+// 官方书单：定义在 @/data/official-booklists，这里只做展示。
+// 卡片不再显示书目数量 —— 官方书单是「规则」而非固定清单，数量要等打开时
+// 经接口解析才知道，写死一个数字等于给用户看假数据。
+const officialLists = OFFICIAL_BOOKLISTS
 
 const showMineTab = computed(() => userStore.isLogin)
 
@@ -70,7 +68,7 @@ function goDetail(id) {
             <div class="card-body">
               <h4 class="list-name text-ellipsis">{{ list.name }}</h4>
               <p class="list-desc text-ellipsis-2">{{ list.description }}</p>
-              <p class="list-count">{{ list.bookCount }} 本书</p>
+              <p class="list-count"><el-tag size="small" type="danger" effect="plain">{{ list.tag }}</el-tag></p>
             </div>
             <div class="card-arrow">
               <el-icon><ArrowRight /></el-icon>

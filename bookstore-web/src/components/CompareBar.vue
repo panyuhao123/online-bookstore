@@ -1,69 +1,42 @@
 <script setup>
-import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { getCompareList, setCompareList } from '@/utils/storage'
+import { useCompareStore } from '@/stores/compare'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
-const compareList = ref(getCompareList())
-
-watch(
-  () => compareList.value,
-  (val) => setCompareList(val),
-  { deep: true }
-)
-
-// 供外部调用：加入对比
-function addToCompare(book) {
-  if (compareList.value.some((b) => b.id === book.id)) {
-    ElMessage.info('该图书已在对比栏中')
-    return
-  }
-  if (compareList.value.length >= 4) {
-    ElMessage.warning('最多对比 4 本图书')
-    return
-  }
-  compareList.value.push({
-    id: book.id,
-    title: book.title,
-    coverUrl: book.coverUrl,
-    author: book.author,
-    price: book.price,
-    publisher: book.publisher
-  })
-  ElMessage.success('已加入对比栏')
-}
-
-function removeFromCompare(id) {
-  compareList.value = compareList.value.filter((b) => b.id !== id)
-}
+const compareStore = useCompareStore()
 
 function goCompare() {
-  if (compareList.value.length < 2) {
+  if (compareStore.count < 2) {
     ElMessage.warning('请至少选择 2 本图书进行对比')
     return
   }
   router.push('/compare')
 }
-
-defineExpose({ addToCompare, compareList })
 </script>
 
 <template>
   <transition name="slide">
-    <div v-if="compareList.length > 0" class="compare-bar">
-      <div class="compare-inner">
-        <span class="label">对比栏 ({{ compareList.length }}/4)</span>
-        <div class="compare-items">
-          <div v-for="book in compareList" :key="book.id" class="compare-item">
-            <span class="book-title text-ellipsis">{{ book.title }}</span>
-            <el-icon class="remove" @click="removeFromCompare(book.id)"><Close /></el-icon>
-          </div>
+    <div v-if="compareStore.count > 0" class="compare-bar">
+      <div class="compare-header">
+        <span class="label">对比栏 ({{ compareStore.count }}/4)</span>
+        <el-button link size="small" class="clear-btn" @click="compareStore.clear()">清空</el-button>
+      </div>
+      <div class="compare-items">
+        <div
+          v-for="book in compareStore.list"
+          :key="book.id"
+          class="compare-item"
+          @click="router.push('/books/' + book.id)"
+        >
+          <span class="book-title text-ellipsis">{{ book.title }}</span>
+          <el-icon class="remove" @click.stop="compareStore.remove(book.id)"><Close /></el-icon>
         </div>
-        <div class="actions">
-          <el-button size="small" @click="compareList = []">清空</el-button>
-          <el-button type="primary" size="small" @click="goCompare">开始对比</el-button>
-        </div>
+      </div>
+      <div class="actions">
+        <el-button type="primary" size="small" @click="goCompare">
+          开始对比（{{ compareStore.count }}）
+        </el-button>
       </div>
     </div>
   </transition>
@@ -86,10 +59,11 @@ defineExpose({ addToCompare, compareList })
   overflow: hidden;
 }
 
-.compare-inner {
-  padding: 14px 16px;
+.compare-header {
+  padding: 10px 14px;
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
   border-bottom: 1px solid var(--border-light);
   background: var(--brand-weak);
@@ -111,6 +85,11 @@ defineExpose({ addToCompare, compareList })
   border-radius: 2px;
 }
 
+.clear-btn {
+  padding: 0;
+  font-size: 12px;
+}
+
 .compare-items {
   display: flex;
   flex-direction: column;
@@ -128,6 +107,7 @@ defineExpose({ addToCompare, compareList })
   background: var(--bg-fill);
   border-radius: var(--radius-sm);
   font-size: 13px;
+  cursor: pointer;
   transition: background 0.15s;
 }
 
@@ -139,7 +119,6 @@ defineExpose({ addToCompare, compareList })
   flex: 1;
   font-size: 13px;
   color: var(--text-primary);
-  cursor: pointer;
 }
 
 .remove {
@@ -154,15 +133,13 @@ defineExpose({ addToCompare, compareList })
 }
 
 .actions {
-  display: flex;
-  gap: 8px;
   padding: 10px 12px;
   border-top: 1px solid var(--border-light);
   background: #fff;
 }
 
 .actions .el-button {
-  flex: 1;
+  width: 100%;
 }
 
 .slide-enter-active,

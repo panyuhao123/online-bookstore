@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { pageOrders } from '@/api/order'
@@ -18,11 +18,30 @@ const menuItems = [
   { label: '我的评价', path: '/account/reviews', icon: 'ChatDotRound' }
 ]
 
-const quickStats = computed(() => [
-  { label: '待支付', count: 0, status: 1 },
-  { label: '待收货', count: 0, status: 3 },
-  { label: '已完成', count: 0, status: 4 }
+/**
+ * 订单统计。
+ *
+ * <p>此前这里是三个写死 count: 0 的常量、模板里也没渲染 —— 纯粹的占位死代码。
+ * 改成真实数据：分页接口每页取 1 条，只读返回的 total 计数。
+ */
+const stats = ref([
+  { label: '待支付', status: 1, count: 0 },
+  { label: '待收货', status: 3, count: 0 },
+  { label: '已完成', status: 4, count: 0 }
 ])
+
+async function loadStats() {
+  const results = await Promise.allSettled(
+    stats.value.map((s) => pageOrders({ pageNum: 1, pageSize: 1, status: s.status }))
+  )
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled') stats.value[i].count = r.value?.total || 0
+  })
+}
+
+function goOrdersByStatus(status) {
+  router.push({ path: '/orders', query: { status } })
+}
 
 async function loadRecentOrders() {
   try {
@@ -34,6 +53,7 @@ async function loadRecentOrders() {
 }
 
 onMounted(() => {
+  loadStats()
   loadRecentOrders()
 })
 </script>
@@ -61,6 +81,19 @@ onMounted(() => {
 
       <!-- 右侧内容 -->
       <div class="content">
+        <!-- 订单统计 -->
+        <div class="stat-card card">
+          <div
+            v-for="s in stats"
+            :key="s.status"
+            class="stat-item"
+            @click="goOrdersByStatus(s.status)"
+          >
+            <span class="stat-count">{{ s.count }}</span>
+            <span class="stat-label">{{ s.label }}</span>
+          </div>
+        </div>
+
         <!-- 账号信息卡 -->
         <div class="info-card card">
           <h3>账号信息</h3>
@@ -202,6 +235,39 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.stat-card {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 8px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 18px 12px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.stat-item:hover {
+  background: var(--brand-weak);
+}
+
+.stat-count {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--brand);
+}
+
+.stat-label {
+  font-size: 13px;
+  color: var(--text-sub);
 }
 
 .info-card,

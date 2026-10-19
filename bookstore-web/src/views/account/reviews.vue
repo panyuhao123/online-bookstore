@@ -9,7 +9,6 @@ const router = useRouter()
 const reviews = ref([])
 const total = ref(0)
 const loading = ref(false)
-const activeTab = ref('all') // all | published
 const pageNum = ref(1)
 const pageSize = ref(10)
 
@@ -29,13 +28,15 @@ onMounted(loadReviews)
 
 <template>
   <div class="page-container reviews-page">
-    <h2 class="page-title">我的评价</h2>
+    <div class="page-header">
+      <h2>我的评价</h2>
+      <!-- 评价入口在订单里（只有「已完成」的订单可评价），这里给一个直达入口 -->
+      <el-button type="primary" @click="router.push('/orders')">
+        <el-icon><EditPen /></el-icon> 去评价
+      </el-button>
+    </div>
 
     <div class="card">
-      <el-tabs v-model="activeTab">
-        <el-tab-pane label="已发表评价" name="all" />
-      </el-tabs>
-
       <el-table :data="reviews" v-loading="loading" style="width: 100%">
         <el-table-column label="图书" min-width="280">
           <template #default="{ row }">
@@ -73,15 +74,23 @@ onMounted(loadReviews)
         />
       </div>
 
-      <el-empty v-if="reviews.length === 0 && !loading" description="暂无评价记录" />
+      <el-empty v-if="reviews.length === 0 && !loading" description="还没有发表过评价">
+        <el-button type="primary" @click="router.push('/orders')">去订单里评价</el-button>
+      </el-empty>
     </div>
   </div>
 </template>
 
 <style scoped>
-.page-title {
-  font-size: 20px;
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 16px;
+}
+
+.page-header h2 {
+  font-size: 20px;
 }
 
 .book-cell {

@@ -1,6 +1,7 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { saveRedirect } from '@/utils/storage'
 
 /**
  * 路由表。
@@ -157,7 +158,7 @@ router.beforeEach((to, from, next) => {
   const userStore = useUserStore()
   if (to.meta.requiresAuth && !userStore.isLogin) {
     // 记录来源页，登录后回跳
-    localStorage.setItem('bookstore_web_redirect', to.fullPath)
+    saveRedirect(to.fullPath)
     ElMessage.warning('请先登录')
     next('/login')
     return

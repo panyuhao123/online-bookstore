@@ -1,11 +1,12 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { pageOrders, cancelOrder } from '@/api/order'
 import { orderStatusText, orderStatusTagType, formatPrice, formatDateTime } from '@/utils/format'
 import { exportToExcel } from '@/utils/excel'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
+const route = useRoute()
 const router = useRouter()
 const orders = ref([])
 const total = ref(0)
@@ -69,7 +70,12 @@ function exportOrders() {
   exportToExcel(orders.value, columns, '我的订单_' + Date.now())
 }
 
-onMounted(loadOrders)
+onMounted(() => {
+  // 支持 /orders?status=4（个人中心统计卡点进来时直接定到对应标签）
+  const s = route.query.status
+  if (s !== undefined && s !== null && s !== '') activeStatus.value = Number(s)
+  loadOrders()
+})
 </script>
 
 <template>
@@ -115,6 +121,15 @@ onMounted(loadOrders)
         <el-table-column label="操作" width="180" align="center" fixed="right">
           <template #default="{ row }">
             <el-button size="small" link type="primary" @click="router.push('/orders/' + row.id)">详情</el-button>
+            <el-button
+              v-if="row.status === 4"
+              size="small"
+              link
+              type="success"
+              @click="router.push('/orders/' + row.id)"
+            >
+              去评价
+            </el-button>
             <el-button v-if="row.status === 1" size="small" link type="danger" @click="onCancel(row)">取消</el-button>
           </template>
         </el-table-column>

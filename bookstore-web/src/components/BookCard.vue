@@ -3,66 +3,29 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { bookCover, placeholderCover } from '@/utils/image'
 import { formatPrice, formatRating } from '@/utils/format'
-import { useCartStore } from '@/stores/cart'
-import { useUserStore } from '@/stores/user'
-import { ElMessage } from 'element-plus'
-import { ShoppingCart, DataAnalysis, Check } from '@element-plus/icons-vue'
-import { getCompareList, setCompareList } from '@/utils/storage'
+import { useCompareStore } from '@/stores/compare'
+import { addToCartGuarded } from '@/utils/cart-action'
+import { ShoppingCart, DataAnalysis } from '@element-plus/icons-vue'
 
 const props = defineProps({
   book: { type: Object, required: true }
 })
 
 const router = useRouter()
-const cartStore = useCartStore()
-const userStore = useUserStore()
+const compareStore = useCompareStore()
 
 const isHover = ref(false)
 const cover = computed(() => bookCover(props.book) || placeholderCover(props.book.title))
 const soldOut = computed(() => props.book.stock <= 0)
-const inCompare = computed(() => getCompareList().some((b) => b.id === props.book.id))
+// 依赖 compare store 的响应式状态，加入/移出对比后卡片标记会立即更新
+const inCompare = computed(() => compareStore.has(props.book.id))
 
-async function addCart() {
-  if (soldOut.value) {
-    ElMessage.warning('该图书已售罄')
-    return
-  }
-  if (!userStore.isLogin) {
-    ElMessage.warning('请先登录后再加购')
-    localStorage.setItem('bookstore_web_redirect', router.currentRoute.value.fullPath)
-    router.push('/login')
-    return
-  }
-  await cartStore.add(props.book.id, 1)
-  ElMessage.success('已加入购物车')
+function addCart() {
+  return addToCartGuarded(props.book, { router })
 }
 
 function toggleCompare() {
-  const list = getCompareList()
-  if (inCompare.value) {
-    setCompareList(list.filter((b) => b.id !== props.book.id))
-    ElMessage.info('已从对比栏移除')
-    return
-  }
-  if (list.length >= 4) {
-    ElMessage.warning('最多对比 4 本图书')
-    return
-  }
-  list.push({
-    id: props.book.id,
-    title: props.book.title,
-    coverUrl: props.book.coverUrl,
-    author: props.book.author,
-    price: props.book.price,
-    publisher: props.book.publisher,
-    publishYear: props.book.publishYear,
-    avgRating: props.book.avgRating,
-    reviewCount: props.book.reviewCount,
-    stock: props.book.stock,
-    description: props.book.description
-  })
-  setCompareList(list)
-  ElMessage.success('已加入对比栏')
+  compareStore.toggle(props.book)
 }
 
 function goDetail() {

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCartStore } from '@/stores/cart'
 import { useBooklistStore } from '@/stores/booklist'
@@ -11,7 +11,16 @@ const router = useRouter()
 const cartStore = useCartStore()
 const booklistStore = useBooklistStore()
 
-const selectedRows = ref([])
+/**
+ * 「已勾选」既是结算依据，也是批量操作的依据。
+ *
+ * <p>此前表格第一列是手写的复选框（绑定 `checked`），却同时又给 el-table 绑了
+ * `@selection-change` —— 没有 `type="selection"` 列时该事件永不触发，
+ * 于是「批量删除 / 加入书单」两个按钮一直是禁用状态，点了没反应。
+ * 这里直接由勾选状态推导，而不是再引入一套独立的多选。
+ */
+const selectedRows = computed(() => cartStore.list.filter((i) => i.checked === 1))
+
 const allChecked = computed(() =>
   cartStore.list.length > 0 && cartStore.list.every((i) => i.checked === 1)
 )
@@ -25,10 +34,6 @@ async function loadCart() {
   } catch (e) {
     /* 静默 */
   }
-}
-
-function handleSelectionChange(rows) {
-  selectedRows.value = rows
 }
 
 async function toggleAll(val) {
@@ -142,7 +147,6 @@ onMounted(loadCart)
       <el-table
         :data="cartStore.list"
         row-key="id"
-        @selection-change="handleSelectionChange"
         style="width: 100%"
       >
         <el-table-column width="50">

@@ -1,49 +1,43 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getBook } from '@/api/book'
-import { getCompareList, setCompareList } from '@/utils/storage'
-import { useCartStore } from '@/stores/cart'
-import { useUserStore } from '@/stores/user'
+import { useCompareStore } from '@/stores/compare'
+import { addToCartGuarded } from '@/utils/cart-action'
 import { formatPrice, formatRating } from '@/utils/format'
 import { bookCover, placeholderCover } from '@/utils/image'
-import { ElMessage } from 'element-plus'
 
 const router = useRouter()
-const cartStore = useCartStore()
-const userStore = useUserStore()
+const compareStore = useCompareStore()
 
-const compareIds = ref(getCompareList().map((b) => b.id))
 const books = ref([])
 const loading = ref(false)
 
 async function loadBooks() {
-  if (compareIds.value.length === 0) return
+  const ids = compareStore.ids
+  if (ids.length === 0) {
+    books.value = []
+    return
+  }
   loading.value = true
   try {
-    const results = await Promise.allSettled(compareIds.value.map((id) => getBook(id)))
-    books.value = results
-      .filter((r) => r.status === 'fulfilled')
-      .map((r) => r.value)
+    const results = await Promise.allSettled(ids.map((id) => getBook(id)))
+    // 有图书查不到（下架/删除）时，顺手把它从对比栏摘掉，避免对比页一直少一格
+    books.value = results.filter((r) => r.status === 'fulfilled').map((r) => r.value)
+    const loadedIds = new Set(books.value.map((b) => b.id))
+    ids.filter((id) => !loadedIds.has(id)).forEach((id) => compareStore.remove(id))
   } finally {
     loading.value = false
   }
 }
 
-function removeBook(idx) {
-  books.value.splice(idx, 1)
-  compareIds.value = books.value.map((b) => b.id)
-  setCompareList(books.value.map((b) => ({ id: b.id, title: b.title, coverUrl: b.coverUrl, author: b.author, price: b.price })))
+function removeBook(book) {
+  compareStore.remove(book.id)
+  books.value = books.value.filter((b) => b.id !== book.id)
 }
 
-async function addToCart(book) {
-  if (!userStore.isLogin) {
-    ElMessage.warning('请先登录')
-    router.push('/login')
-    return
-  }
-  await cartStore.add(book.id, 1)
-  ElMessage.success('已加入购物车')
+function addToCart(book) {
+  return addToCartGuarded(book, { router })
 }
 
 // 判断某字段是否有差异，用于高亮
@@ -82,9 +76,9 @@ onMounted(loadBooks)
         <thead>
           <tr>
             <th class="field-col">对比项</th>
-            <th v-for="(book, idx) in books" :key="book.id" class="book-col">
+            <th v-for="book in books" :key="book.id" class="book-col">
               <div class="col-header">
-                <el-button link type="danger" size="small" @click="removeBook(idx)" class="remove-btn">
+                <el-button link type="danger" size="small" @click="removeBook(book)" class="remove-btn">
                   <el-icon><Close /></el-icon>
                 </el-button>
               </div>

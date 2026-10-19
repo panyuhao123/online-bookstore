@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, nextTick, onMounted } from 'vue'
 import { getAddressList, addAddress, updateAddress, removeAddress, setDefaultAddress, geocodeAddress } from '@/api/address'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { AddLocation, Search } from '@element-plus/icons-vue'
@@ -7,6 +7,10 @@ import { AddLocation, Search } from '@element-plus/icons-vue'
 const addresses = ref([])
 const drawerVisible = ref(false)
 const editingId = ref(null)
+
+// 表单实例：模板上 ref="formRef" 依赖此变量，缺了它保存会直接 return（曾导致「地址保存无反应」）
+const formRef = ref(null)
+const submitting = ref(false)
 
 const geocoding = ref(false)
 const candidateDialog = ref(false)
@@ -54,12 +58,32 @@ function openAdd() {
     detail: '', isDefault: 0
   })
   drawerVisible.value = true
+  clearValidate()
 }
 
 function openEdit(addr) {
   editingId.value = addr.id
-  Object.assign(form, { ...addr })
+  // 只取表单用得到的字段：直接把整个 addr 铺进 form 会把 id / fullAddress 之类的
+  // 冗余键带进响应式对象，回填与重置时容易出错
+  Object.assign(form, {
+    receiver: addr.receiver || '',
+    phone: addr.phone || '',
+    province: addr.province || '',
+    city: addr.city || '',
+    district: addr.district || '',
+    provinceAdcode: addr.provinceAdcode || '',
+    cityAdcode: addr.cityAdcode || '',
+    districtAdcode: addr.districtAdcode || '',
+    detail: addr.detail || '',
+    isDefault: addr.isDefault ?? 0
+  })
   drawerVisible.value = true
+  clearValidate()
+}
+
+/** 抽屉打开后再清校验态 —— 否则会带着上一条地址的红色报错进来看 */
+function clearValidate() {
+  nextTick(() => formRef.value?.clearValidate())
 }
 
 /**
@@ -122,39 +146,46 @@ function onCancelCandidate() {
   // 用户可以手动编辑 province/city/district 三个 input
 }
 
-async function onSubmit(formEl) {
+async function onSubmit() {
+  const formEl = formRef.value
   if (!formEl) return
-  await formEl.validate(async (valid) => {
-    if (!valid) return
-    try {
-      // 提交时带上 adcode 字段（如果用户没解析，就是空字符串）
-      const payload = {
-        receiver: form.receiver,
-        phone: form.phone,
-        province: form.province,
-        city: form.city,
-        district: form.district,
-        detail: form.detail,
-        isDefault: form.isDefault
-      }
-      // adcode 可选 —— 有值才传（后端 Entity 字段允许 null）
-      if (form.provinceAdcode) payload.provinceAdcode = form.provinceAdcode
-      if (form.cityAdcode) payload.cityAdcode = form.cityAdcode
-      if (form.districtAdcode) payload.districtAdcode = form.districtAdcode
+  // 不用 validate(callback)：回调 + Promise 混用时校验失败会让 Promise 变成
+  // 未处理的 rejection，页面控制台报错却看不出是校验没过。
+  const valid = await formEl.validate().catch(() => false)
+  if (!valid) return
 
-      if (editingId.value) {
-        await updateAddress(editingId.value, payload)
-        ElMessage.success('地址已更新')
-      } else {
-        await addAddress(payload)
-        ElMessage.success('地址已添加')
-      }
-      drawerVisible.value = false
-      loadAddresses()
-    } catch (e) {
-      /* 错误已提示 */
+  submitting.value = true
+  try {
+    // 提交时带上 adcode 字段（如果用户没解析，就是空字符串）
+    const payload = {
+      receiver: form.receiver,
+      phone: form.phone,
+      province: form.province,
+      city: form.city,
+      district: form.district,
+      detail: form.detail,
+      isDefault: form.isDefault
     }
-  })
+    // adcode 可选 —— 有值才传（后端 Entity 字段允许 null）
+    if (form.provinceAdcode) payload.provinceAdcode = form.provinceAdcode
+    if (form.cityAdcode) payload.cityAdcode = form.cityAdcode
+    if (form.districtAdcode) payload.districtAdcode = form.districtAdcode
+
+    if (editingId.value) {
+      await updateAddress(editingId.value, payload)
+      ElMessage.success('地址已更新')
+    } else {
+      await addAddress(payload)
+      ElMessage.success('地址已添加')
+    }
+    drawerVisible.value = false
+    formEl.resetFields()
+    loadAddresses()
+  } catch (e) {
+    /* 错误已提示 */
+  } finally {
+    submitting.value = false
+  }
 }
 
 async function onRemove(addr) {
@@ -167,9 +198,13 @@ async function onRemove(addr) {
 }
 
 async function onSetDefault(addr) {
-  await setDefaultAddress(addr.id)
-  ElMessage.success('已设为默认地址')
-  loadAddresses()
+  try {
+    await setDefaultAddress(addr.id)
+    ElMessage.success('已设为默认地址')
+    loadAddresses()
+  } catch (e) {
+    /* 错误已提示 */
+  }
 }
 
 onMounted(loadAddresses)
@@ -251,7 +286,7 @@ onMounted(loadAddresses)
       </el-form>
       <template #footer>
         <el-button @click="drawerVisible = false">取消</el-button>
-        <el-button type="primary" @click="onSubmit(formRef)">保存</el-button>
+        <el-button type="primary" :loading="submitting" @click="onSubmit">保存</el-button>
       </template>
     </el-drawer>
 

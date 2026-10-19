@@ -6,24 +6,25 @@ import { getCategories } from '@/api/category'
 import { pageBookReviews, getReviewSummary } from '@/api/review'
 import CompareBar from '@/components/CompareBar.vue'
 import BookCard from '@/components/BookCard.vue'
+import { useCompareStore } from '@/stores/compare'
 import { useCartStore } from '@/stores/cart'
-import { useUserStore } from '@/stores/user'
 import { useHistoryStore } from '@/stores/history'
+import { addToCartGuarded } from '@/utils/cart-action'
+import { setBuyNow } from '@/utils/buy-now'
 import { formatPrice, formatRating, formatDateTime } from '@/utils/format'
 import { bookCover, placeholderCover } from '@/utils/image'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const route = useRoute()
 const router = useRouter()
+const compareStore = useCompareStore()
 const cartStore = useCartStore()
-const userStore = useUserStore()
 const historyStore = useHistoryStore()
 
 const book = ref(null)
 const loading = ref(true)
 const quantity = ref(1)
 const activeTab = ref('description')
-const compareBarRef = ref(null)
 
 const categories = ref([])
 const categoryName = computed(() => {
@@ -94,37 +95,25 @@ async function loadSimilar() {
 }
 
 async function addToCart() {
-  if (soldOut.value) {
-    ElMessage.warning('该图书已售罄')
-    return
-  }
-  if (!userStore.isLogin) {
-    ElMessage.warning('请先登录')
-    localStorage.setItem('bookstore_web_redirect', route.fullPath)
-    router.push('/login')
-    return
-  }
-  await cartStore.add(book.value.id, quantity.value)
-  ElMessage.success('已加入购物车')
+  return addToCartGuarded(book.value, { quantity: quantity.value, router })
 }
 
 async function buyNow() {
-  if (soldOut.value) {
-    ElMessage.warning('该图书已售罄')
-    return
-  }
-  if (!userStore.isLogin) {
-    ElMessage.warning('请先登录')
-    localStorage.setItem('bookstore_web_redirect', route.fullPath)
-    router.push('/login')
-    return
-  }
-  await cartStore.add(book.value.id, quantity.value)
+  const ok = await addToCartGuarded(book.value, {
+    quantity: quantity.value,
+    router,
+    silent: true
+  })
+  if (!ok) return
+  // 加购后购物车已刷新，反查这次加入的 cartId：结算页只结算这一条，
+  // 否则会连购物车里原本勾着的其它书一起下单。
+  const item = cartStore.list.find((i) => i.bookId === book.value.id)
+  setBuyNow(item ? [item.id] : [])
   router.push('/orders/confirm')
 }
 
 function addToCompare() {
-  compareBarRef.value?.addToCompare(book.value)
+  compareStore.add(book.value)
 }
 
 onMounted(async () => {
@@ -292,7 +281,7 @@ const maxCount = computed(() => Math.max(...distribution.value.map((d) => d.coun
       </template>
     </el-result>
 
-    <CompareBar ref="compareBarRef" />
+    <CompareBar />
   </div>
 </template>
 

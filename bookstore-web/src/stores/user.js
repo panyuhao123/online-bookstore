@@ -19,15 +19,15 @@ export const useUserStore = defineStore('user', () => {
     return res
   }
 
+  /**
+   * 注册。
+   *
+   * <p>注册接口只返回 UserVO、不签发令牌；而登录接口的 captchaKey / captchaCode 是必填，
+   * 注册页没有图形验证码，之前在这里「注册成功后顺手调一次 login」必然 422 失败 ——
+   * 用户看到的是「注册成功，已自动登录」这句提示压根没执行。改为注册成功后引导去登录页。
+   */
   async function register(form) {
-    const res = await registerApi(form)
-    // 注册成功后自动登录
-    const loginRes = await loginApi({ phone: form.phone, password: form.password })
-    token.value = loginRes.token
-    userInfo.value = loginRes.user
-    setToken(loginRes.token)
-    setUser(loginRes.user)
-    return res
+    return registerApi(form)
   }
 
   async function fetchUserInfo() {

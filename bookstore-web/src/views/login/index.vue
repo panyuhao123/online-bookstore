@@ -91,7 +91,11 @@ async function onSubmit() {
   }
 }
 
-onMounted(refreshCaptcha)
+onMounted(() => {
+  // 从注册页跳过来时会带上手机号，省得再输一遍
+  if (route.query.phone) loginForm.phone = String(route.query.phone)
+  refreshCaptcha()
+})
 </script>
 
 <template>

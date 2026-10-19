@@ -4,17 +4,22 @@ import { useRoute, useRouter } from 'vue-router'
 import { pageBooks } from '@/api/book'
 import BookCard from '@/components/BookCard.vue'
 import CompareBar from '@/components/CompareBar.vue'
-import { useCartStore } from '@/stores/cart'
 import { useUserStore } from '@/stores/user'
 import { useBooklistStore } from '@/stores/booklist'
+import { useCompareStore } from '@/stores/compare'
+import { addBatchToCartGuarded, addToCartGuarded } from '@/utils/cart-action'
+import { bookCover, placeholderCover } from '@/utils/image'
 import { formatPrice, formatRating } from '@/utils/format'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const route = useRoute()
 const router = useRouter()
-const cartStore = useCartStore()
 const userStore = useUserStore()
 const booklistStore = useBooklistStore()
+const compareStore = useCompareStore()
+
+/** 后端 BookQuery.ALLOWED_SORTS 白名单；传其它值后端会静默回落成 default */
+const ALLOWED_SORTS = ['default', 'sales', 'price_asc', 'price_desc']
 
 const books = ref([])
 const total = ref(0)
@@ -33,7 +38,6 @@ const query = reactive({
 
 // 表格多选
 const selectedBooks = ref([])
-const compareBarRef = ref(null)
 
 const priceRanges = [
   { label: '全部', min: null, max: null },
@@ -71,7 +75,7 @@ function setPriceRange(idx) {
 }
 
 function setSort(val) {
-  query.sort = val
+  query.sort = ALLOWED_SORTS.includes(val) ? val : 'default'
   query.pageNum = 1
   loadBooks()
 }
@@ -103,27 +107,11 @@ function handleSelectionChange(rows) {
 }
 
 async function batchAddToCart() {
-  if (selectedBooks.value.length === 0) {
-    ElMessage.warning('请先选择图书')
-    return
-  }
-  if (!userStore.isLogin) {
-    ElMessage.warning('请先登录')
-    localStorage.setItem('bookstore_web_redirect', route.fullPath)
-    router.push('/login')
-    return
-  }
-  try {
-    await ElMessageBox.confirm(`确认将选中的 ${selectedBooks.value.length} 本图书加入购物车？`, '提示')
-    for (const book of selectedBooks.value) {
-      if (book.stock > 0) {
-        await cartStore.add(book.id, 1)
-      }
-    }
-    ElMessage.success('已加入购物车')
-  } catch (e) {
-    /* 取消 */
-  }
+  return addBatchToCartGuarded(selectedBooks.value, { router })
+}
+
+function addOne(book) {
+  return addToCartGuarded(book, { router })
 }
 
 async function batchAddToBooklist() {
@@ -153,30 +141,39 @@ async function batchAddToBooklist() {
 }
 
 function addToCompare(book) {
-  compareBarRef.value?.addToCompare(book)
+  compareStore.add(book)
 }
 
-const tableColumns = [
-  { prop: 'title', label: '书名' },
-  { prop: 'author', label: '作者', width: 120 },
-  { prop: 'publisher', label: '出版社', width: 160 },
-  { prop: 'price', label: '价格', width: 100 },
-  { prop: 'stock', label: '库存', width: 80 },
-  { prop: 'avgRating', label: '评分', width: 100 }
-]
-
-onMounted(async () => {
-  // 从 URL 读取初始筛选
-  if (route.query.keyword) query.keyword = route.query.keyword
-  if (route.query.categoryId) query.categoryId = Number(route.query.categoryId)
-  loadBooks()
-})
-
-watch(() => route.query, (q) => {
-  if (q.keyword !== undefined) query.keyword = q.keyword
+/**
+ * 把 URL 查询参数同步到筛选条件。
+ *
+ * <p>此前 onMounted 只读 `keyword` / `categoryId`，首页「热销好书 → 查看更多」带的
+ * `?sort=sales` 被直接丢弃、排序实际不生效；这里补上 `sort`，并过一遍白名单 ——
+ * 后端对非法排序值会静默回落成 default，不过滤会让人以为排序坏了。
+ */
+function applyRouteQuery() {
+  const q = route.query
+  if (q.keyword !== undefined) query.keyword = String(q.keyword || '')
   if (q.categoryId !== undefined) query.categoryId = q.categoryId ? Number(q.categoryId) : null
+  if (q.sort !== undefined) {
+    const sort = String(q.sort || '')
+    query.sort = ALLOWED_SORTS.includes(sort) ? sort : 'default'
+  }
+  query.pageNum = 1
+}
+
+onMounted(() => {
+  applyRouteQuery()
   loadBooks()
 })
+
+watch(
+  () => route.query,
+  () => {
+    applyRouteQuery()
+    loadBooks()
+  }
+)
 </script>
 
 <template>
@@ -237,7 +234,7 @@ watch(() => route.query, (q) => {
       <el-button type="success" size="small" @click="batchAddToBooklist">
         <el-icon><Collection /></el-icon> 批量加书单
       </el-button>
-      <el-button size="small" @click="selectedBooks.forEach(b => addToCompare(b))">
+      <el-button size="small" type="success" @click="compareStore.addMany(selectedBooks)">
         <el-icon><ScaleToOriginal /></el-icon> 加入对比
       </el-button>
     </div>
@@ -272,7 +269,11 @@ watch(() => route.query, (q) => {
         <el-table-column type="selection" width="48" />
         <el-table-column label="封面" width="80">
           <template #default="{ row }">
-            <img :src="row.coverUrl" class="table-cover" @click="router.push('/books/' + row.id)" />
+            <img
+              :src="bookCover(row) || placeholderCover(row.title)"
+              class="table-cover"
+              @click="router.push('/books/' + row.id)"
+            />
           </template>
         </el-table-column>
         <el-table-column prop="title" label="书名" min-width="180">
@@ -287,7 +288,11 @@ watch(() => route.query, (q) => {
             <span class="price">{{ formatPrice(row.price) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="stock" label="库存" width="80" />
+        <el-table-column label="库存" width="80">
+          <template #default="{ row }">
+            <span :class="{ 'sold-out': row.stock <= 0 }">{{ row.stock <= 0 ? '售罄' : row.stock }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="评分" width="100">
           <template #default="{ row }">
             {{ formatRating(row.avgRating) }}
@@ -295,7 +300,9 @@ watch(() => route.query, (q) => {
         </el-table-column>
         <el-table-column label="操作" width="120" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" type="primary" link @click="cartStore.add(row.id, 1)">加购</el-button>
+            <el-button size="small" type="primary" link :disabled="row.stock <= 0" @click="addOne(row)">
+              加购
+            </el-button>
             <el-button size="small" link @click="addToCompare(row)">对比</el-button>
           </template>
         </el-table-column>
@@ -314,7 +321,7 @@ watch(() => route.query, (q) => {
       />
     </div>
 
-    <CompareBar ref="compareBarRef" />
+    <CompareBar />
   </div>
 </template>
 
@@ -402,6 +409,10 @@ watch(() => route.query, (q) => {
   object-fit: cover;
   border-radius: 4px;
   cursor: pointer;
+}
+
+.sold-out {
+  color: var(--text-sub);
 }
 
 .book-table {

@@ -18,10 +18,6 @@ export const useCartStore = defineStore('cart', () => {
     list.value.reduce((sum, item) => sum + (item.quantity || 0), 0)
   )
 
-  const checkedIds = computed(() =>
-    list.value.filter((i) => i.checked === 1).map((i) => i.id)
-  )
-
   async function fetchCart() {
     loading.value = true
     try {
@@ -71,7 +67,6 @@ export const useCartStore = defineStore('cart', () => {
     checkedCount,
     loading,
     totalCount,
-    checkedIds,
     fetchCart,
     add,
     updateQuantity,

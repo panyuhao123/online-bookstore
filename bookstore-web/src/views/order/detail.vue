@@ -1,8 +1,8 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getOrder, payOrder, cancelOrder, confirmOrder } from '@/api/order'
-import { getReviewableItems } from '@/api/review'
+import { getReviewableItems, createReview } from '@/api/review'
 import { orderStatusText, orderStatusTagType, formatPrice, formatDateTime } from '@/utils/format'
 import { bookCover, placeholderCover } from '@/utils/image'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -12,6 +12,17 @@ const router = useRouter()
 const order = ref(null)
 const loading = ref(true)
 const reviewableItems = ref([])
+
+// 发表评价
+const reviewVisible = ref(false)
+const reviewSubmitting = ref(false)
+const reviewForm = reactive({
+  bookId: null,
+  bookTitle: '',
+  rating: 5,
+  content: '',
+  anonymous: false
+})
 
 const timeline = computed(() => {
   if (!order.value) return []
@@ -75,6 +86,47 @@ async function onConfirm() {
     loadOrder()
   } catch (e) {
     /* 取消 */
+  }
+}
+
+/** 该商品是否已评价（后端按 orderId + bookId 判定） */
+function isReviewed(bookId) {
+  return !!reviewableItems.value.find((r) => r.bookId === bookId)?.reviewed
+}
+
+function openReview(row) {
+  reviewForm.bookId = row.bookId
+  reviewForm.bookTitle = row.bookTitle
+  reviewForm.rating = 5
+  reviewForm.content = ''
+  reviewForm.anonymous = false
+  reviewVisible.value = true
+}
+
+async function submitReview() {
+  if (!reviewForm.rating) {
+    ElMessage.warning('请先选择评分')
+    return
+  }
+  reviewSubmitting.value = true
+  try {
+    await createReview({
+      orderId: order.value.id,
+      bookId: reviewForm.bookId,
+      rating: reviewForm.rating,
+      content: reviewForm.content || undefined,
+      anonymous: reviewForm.anonymous
+    })
+    ElMessage.success('评价发表成功')
+    reviewVisible.value = false
+    // 重新拉一次评价状态，把该行从「未评价」改成「已评价」
+    reviewableItems.value = await getReviewableItems(route.params.id).catch(
+      () => reviewableItems.value
+    )
+  } catch (e) {
+    /* 重复评价后端返回 409，拦截器已提示 */
+  } finally {
+    reviewSubmitting.value = false
   }
 }
 
@@ -148,8 +200,12 @@ onMounted(loadOrder)
           </el-table-column>
           <el-table-column v-if="order.status === 4" label="评价" width="120" align="center">
             <template #default="{ row }">
-              <span v-if="reviewableItems.find(r => r.bookId === row.bookId)?.reviewed" class="reviewed">已评价</span>
-              <span v-else class="not-reviewed">未评价</span>
+              <span v-if="isReviewed(row.bookId)" class="reviewed">
+                <el-icon><Select /></el-icon> 已评价
+              </span>
+              <el-button v-else size="small" type="primary" link @click="openReview(row)">
+                发表评价
+              </el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -177,6 +233,37 @@ onMounted(loadOrder)
         <el-button type="primary" @click="router.push('/orders')">返回订单列表</el-button>
       </template>
     </el-result>
+
+    <!-- 发表评价 -->
+    <el-dialog v-model="reviewVisible" title="发表评价" width="480px">
+      <div class="review-book">
+        <span class="review-book-label">图书</span>
+        <span class="review-book-title">{{ reviewForm.bookTitle }}</span>
+      </div>
+      <el-form label-width="70px" label-position="left">
+        <el-form-item label="评分" required>
+          <el-rate v-model="reviewForm.rating" show-text :texts="['很差', '较差', '一般', '满意', '推荐']" />
+        </el-form-item>
+        <el-form-item label="评价">
+          <el-input
+            v-model="reviewForm.content"
+            type="textarea"
+            :rows="4"
+            maxlength="300"
+            show-word-limit
+            placeholder="说说这本书值不值得读（选填）"
+          />
+        </el-form-item>
+        <el-form-item label="匿名">
+          <el-switch v-model="reviewForm.anonymous" />
+          <span class="anon-tip">开启后其他用户看不到你的昵称</span>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="reviewVisible = false">取消</el-button>
+        <el-button type="primary" :loading="reviewSubmitting" @click="submitReview">提交评价</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -269,9 +356,41 @@ onMounted(loadOrder)
 
 .reviewed {
   color: #67c23a;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .not-reviewed {
+  color: var(--text-sub);
+}
+
+.review-book {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  background: var(--bg-fill);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.review-book-label {
+  color: var(--text-sub);
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.review-book-title {
+  color: var(--text-primary);
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.anon-tip {
+  margin-left: 10px;
+  font-size: 12px;
   color: var(--text-sub);
 }
 

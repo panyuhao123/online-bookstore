@@ -1,9 +1,10 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getAddressList } from '@/api/address'
 import { createOrder } from '@/api/order'
 import { useCartStore } from '@/stores/cart'
+import { clearBuyNow, peekBuyNow } from '@/utils/buy-now'
 import { formatPrice } from '@/utils/format'
 import { bookCover, placeholderCover } from '@/utils/image'
 import { ElMessage } from 'element-plus'
@@ -16,9 +17,21 @@ const selectedAddressId = ref(null)
 const addressDrawer = ref(false)
 const submitting = ref(false)
 
-// 已勾选的购物车条目
-const checkedItems = computed(() => cartStore.list.filter((i) => i.checked === 1))
-const totalAmount = computed(() => cartStore.checkedAmount)
+/** 来自「立即购买」时只结算指定条目；为空表示按购物车勾选结算 */
+const buyNowIds = ref(peekBuyNow())
+const isBuyNow = computed(() => buyNowIds.value.length > 0)
+
+const checkedItems = computed(() => {
+  if (isBuyNow.value) {
+    return cartStore.list.filter((i) => buyNowIds.value.includes(i.id))
+  }
+  return cartStore.list.filter((i) => i.checked === 1)
+})
+
+// 用本地小计求和，而不是后端的 checkedAmount —— 立即购买时两者口径不同
+const totalAmount = computed(() =>
+  checkedItems.value.reduce((sum, i) => sum + Number(i.subtotal ?? i.price * i.quantity ?? 0), 0)
+)
 const totalQuantity = computed(() => checkedItems.value.reduce((s, i) => s + i.quantity, 0))
 
 const selectedAddress = computed(() =>
@@ -75,6 +88,9 @@ onMounted(async () => {
   await cartStore.fetchCart()
   await loadAddresses()
 })
+
+// 离开结算页时清掉标记，避免下次进结算页还在结算「上次立即购买」的那本
+onUnmounted(clearBuyNow)
 </script>
 
 <template>
@@ -110,7 +126,15 @@ onMounted(async () => {
     <!-- 商品清单 -->
     <div class="section card">
       <div class="section-header">
-        <h3>商品清单</h3>
+        <h3>
+          商品清单
+          <el-tag v-if="isBuyNow" size="small" type="danger" effect="plain" class="mode-tag">
+            立即购买
+          </el-tag>
+          <el-tag v-else size="small" type="info" effect="plain" class="mode-tag">
+            购物车结算
+          </el-tag>
+        </h3>
         <span class="count-text">共 {{ totalQuantity }} 件</span>
       </div>
       <el-table :data="checkedItems" style="width: 100%">
@@ -220,6 +244,11 @@ onMounted(async () => {
 .count-text {
   font-size: 13px;
   color: var(--text-sub);
+}
+
+.mode-tag {
+  margin-left: 8px;
+  font-weight: 400;
 }
 
 .address-card {

@@ -48,3 +48,9 @@ tools/out/*.log
 # 页面截图同样是可重跑产物（tools/shot_admin_pages.cjs、tools/shot_app_preview.cjs），
 # 入库只会让仓库越来越胖；需要看图时本地跑一次即可。
 tools/out/*.png
+
+# ===== 封面抓取的一次性中间产物 =====
+# fetch_covers.py / refetch_mock_covers.py 下载的候选图，仅供 covers_preview.py
+# 本地拼图核对，可随时重跑生成；约 5.3 MB，不入库（本地文件保留）。
+tools/covers_tmp/
+tools/covers_preview.png

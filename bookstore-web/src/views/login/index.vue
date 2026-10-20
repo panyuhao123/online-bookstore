@@ -185,7 +185,9 @@ onMounted(() => {
 <style scoped>
 .login-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #b9554e 0%, #7e3a35 100%);
+  /* 淡暖底 + 白卡片 + 1px 边框：与全站「灰底白块」同一套语言，
+     满屏深红会把登录页变成另一个产品的门面 */
+  background: linear-gradient(135deg, #fff7f5 0%, #ffe9e3 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -200,7 +202,8 @@ onMounted(() => {
 .login-card {
   padding: 44px 36px 32px;
   border-radius: var(--radius-lg);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 6px 24px rgba(180, 60, 40, 0.12);
+  border: 1px solid var(--border);
 }
 
 .login-header {

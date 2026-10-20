@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { pageBooks, getHotBooks, getBook } from '@/api/book'
 import { getCategories } from '@/api/category'
@@ -12,11 +12,15 @@ import { ElMessage } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
 
 /**
- * 首页。
+ * 首页（当当风格）。
  *
- * <p>四块内容，按"用户从不知道买什么到知道买什么"的顺序排：
- * Banner（今天有什么活动）→ 热销榜（别人都在买什么）→ 分类楼层（按类逛）
- * → 猜你喜欢（顺着你自己的口味推）。
+ * <p>排布逻辑与当当一致：**先把入口铺满，再谈内容**。
+ * 首屏三栏 —— 左分类树（不知道买什么就按类逛）、中轮播（今天有什么活动）、
+ * 右公告与热销榜（别人都在买什么）；首屏之下是限时特惠（给你一个现在就下单的理由）、
+ * 猜你喜欢（顺着你的口味推）、分类楼层（按类深入）。
+ *
+ * <p>这跟改造前「大 Banner + 5 列网格」的差别不在于好不好看，而在于
+ * 首屏能点的地方从 5 个变成 20 多个 —— 电商首页的转化率取决于入口数量。
  */
 
 const router = useRouter()
@@ -27,6 +31,9 @@ const hotBooks = ref([])
 const floors = ref([])
 const recommend = ref([])
 const recommendSub = ref('')
+const categories = ref([])
+const deals = ref([])
+const popoverBooks = ref({})
 
 /** Banner 拉不到时用的兜底，保证首屏永远不是一块空白 */
 const FALLBACK_BANNERS = [
@@ -34,26 +41,26 @@ const FALLBACK_BANNERS = [
     id: 'f1',
     title: '新书上架',
     subTitle: '海量新书 抢先阅读',
-    bgColor: 'linear-gradient(135deg,#667eea,#764ba2)',
+    bgColor: 'linear-gradient(135deg,#ff2832,#ff6f00)',
     linkUrl: '/books'
   },
   {
     id: 'f2',
     title: '低价优选',
     subTitle: '精选好书 低至 5 折',
-    bgColor: 'linear-gradient(135deg,#f093fb,#f5576c)',
+    bgColor: 'linear-gradient(135deg,#ff6f00,#ffa726)',
     linkUrl: '/books?sort=price_asc'
   },
   {
     id: 'f3',
     title: '畅销榜单',
     subTitle: '热门好书 不容错过',
-    bgColor: 'linear-gradient(135deg,#4facfe,#00f2fe)',
+    bgColor: 'linear-gradient(135deg,#e6162d,#ff6f00)',
     linkUrl: '/books?sort=sales'
   }
 ]
 
-const rankColors = ['#e6a23c', '#909399', '#c08a4e']
+const rankColors = ['#ff2832', '#ff6f00', '#f5a623']
 
 /** 后台配了图就用图，没配图就用背景色（bgColor 支持 #xxx 或 linear-gradient(...)） */
 function bannerStyle(b) {
@@ -64,7 +71,7 @@ function bannerStyle(b) {
       backgroundPosition: 'center'
     }
   }
-  return { background: b.bgColor || 'linear-gradient(135deg,#667eea,#764ba2)' }
+  return { background: b.bgColor || 'linear-gradient(135deg,#ff2832,#ff6f00)' }
 }
 
 function goBanner(b) {
@@ -77,6 +84,23 @@ function goBanner(b) {
 
 function goBook(id) {
   router.push('/books/' + id)
+}
+
+function goCategory(id) {
+  router.push({ path: '/catalog', query: { categoryId: id } })
+}
+
+/* ===== 限时特惠倒计时：到当天 24 点 ===== */
+const countdown = ref('00:00:00')
+let timer = null
+function tick() {
+  const now = new Date()
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0)
+  let s = Math.max(0, Math.floor((end - now) / 1000))
+  const h = String(Math.floor(s / 3600)).padStart(2, '0')
+  const m = String(Math.floor((s % 3600) / 60)).padStart(2, '0')
+  const sec = String(s % 60).padStart(2, '0')
+  countdown.value = `${h}:${m}:${sec}`
 }
 
 async function loadBanners() {
@@ -94,6 +118,40 @@ async function loadHot() {
     hotBooks.value = await getHotBooks(8)
   } catch (e) {
     hotBooks.value = []
+  }
+}
+
+async function loadCategories() {
+  try {
+    categories.value = (await getCategories()) || []
+  } catch (e) {
+    categories.value = []
+  }
+}
+
+/** 分类树二级面板：hover 才拉，避免首屏并发 10 个请求 */
+async function onCatHover(cat) {
+  if (popoverBooks.value[cat.id]) return
+  try {
+    const res = await pageBooks({ categoryId: cat.id, pageNum: 1, pageSize: 4, sort: 'sales' })
+    popoverBooks.value = { ...popoverBooks.value, [cat.id]: res.list || [] }
+  } catch (e) {
+    popoverBooks.value = { ...popoverBooks.value, [cat.id]: [] }
+  }
+}
+
+/**
+ * 限时特惠：按价格升序取 5 本。
+ *
+ * <p>不用热销榜的数据 —— 「便宜」和「卖得好」是两件事，
+ * 特惠位放热销书只会让用户发现自己买贵了。
+ */
+async function loadDeals() {
+  try {
+    const res = await pageBooks({ pageNum: 1, pageSize: 5, sort: 'price_asc' })
+    deals.value = res.list || []
+  } catch (e) {
+    deals.value = []
   }
 }
 
@@ -192,11 +250,19 @@ async function loadRecommend() {
 }
 
 onMounted(() => {
-  // 四块各自独立加载：Banner 挂了不该连累热销榜，反之亦然
+  // 各块独立加载：Banner 挂了不该连累热销榜，反之亦然
   loadBanners()
   loadHot()
+  loadCategories()
+  loadDeals()
   loadFloors()
   loadRecommend()
+  tick()
+  timer = setInterval(tick, 1000)
+})
+
+onUnmounted(() => {
+  if (timer) clearInterval(timer)
 })
 
 async function exportHotRank() {
@@ -221,115 +287,261 @@ async function exportHotRank() {
 </script>
 
 <template>
-  <div class="page-container home-page">
-    <!-- 首屏两栏：Banner + 热销榜（整个页面的左侧分类栏已由 AppSidebar 承担） -->
-    <div class="hero-row">
-      <!-- 左：Banner（S4，数据来自后台配置） -->
-      <div class="banner-wrap">
-        <el-carousel height="360px" arrow="hover">
-          <el-carousel-item v-for="b in banners" :key="b.id">
-            <div
-              class="banner-slide"
-              :style="bannerStyle(b)"
-              :class="{ clickable: !!b.linkUrl }"
-              @click="goBanner(b)"
-            >
-              <div class="banner-text">
-                <h2>{{ b.title }}</h2>
-                <p v-if="b.subTitle">{{ b.subTitle }}</p>
-                <el-button v-if="b.linkUrl" type="primary" size="large" round @click.stop="goBanner(b)">
-                  立即选购
-                </el-button>
-              </div>
-            </div>
-          </el-carousel-item>
-        </el-carousel>
-      </div>
-
-      <!-- 右：热销榜 -->
-      <div class="rank-card card">
-        <div class="rank-title">
-          <div class="rank-title-left">
-            <el-icon color="var(--brand)"><Trophy /></el-icon>
-            <span>热销榜单</span>
-          </div>
-          <el-button link type="primary" size="small" :icon="Download" @click="exportHotRank">
-            导出 Excel
-          </el-button>
-        </div>
-        <ol class="rank-list">
-          <li
-            v-for="(book, idx) in hotBooks"
-            :key="book.id"
-            class="rank-item"
-            @click="goBook(book.id)"
+  <div class="home-page">
+    <div class="container">
+      <!-- ===== 首屏三栏：分类树 | 轮播 | 公告+热销榜 ===== -->
+      <div class="first-screen">
+        <!-- 左：分类树 -->
+        <aside class="cat-tree">
+          <el-popover
+            v-for="cat in categories.slice(0, 10)"
+            :key="cat.id"
+            placement="right-start"
+            :width="300"
+            trigger="hover"
+            :show-after="120"
+            :hide-after="60"
+            popper-class="cat-popover"
+            @show="onCatHover(cat)"
           >
-            <span
-              class="rank-no"
-              :style="{
-                background: rankColors[idx] || '#dcdfe6',
-                color: idx < 3 ? '#fff' : '#555'
-              }"
-            >{{ idx + 1 }}</span>
-            <div class="rank-info">
-              <p class="rank-title-text text-ellipsis">{{ book.title }}</p>
-              <p class="rank-author text-ellipsis">{{ book.author }}</p>
+            <div class="pop-content">
+              <div class="pop-head">
+                <span class="pop-title">{{ cat.name }}</span>
+                <a class="pop-more" @click="goCategory(cat.id)">查看全部 ›</a>
+              </div>
+              <div v-if="(popoverBooks[cat.id] || []).length" class="pop-books">
+                <a
+                  v-for="b in popoverBooks[cat.id]"
+                  :key="b.id"
+                  class="pop-book"
+                  @click="goBook(b.id)"
+                >
+                  <span class="pop-book-title text-ellipsis">{{ b.title }}</span>
+                  <span class="pop-book-price">{{ formatPrice(b.price) }}</span>
+                </a>
+              </div>
+              <div v-else class="pop-empty">该分类暂无图书</div>
             </div>
-            <span class="rank-price">{{ formatPrice(book.price) }}</span>
-          </li>
-        </ol>
+
+            <template #reference>
+              <div class="cat-item" @click="goCategory(cat.id)">
+                <span class="cat-name">{{ cat.name }}</span>
+                <el-icon class="cat-arrow" :size="12"><ArrowRight /></el-icon>
+              </div>
+            </template>
+          </el-popover>
+          <div v-if="categories.length === 0" class="cat-empty">分类加载中…</div>
+        </aside>
+
+        <!-- 中：轮播（S4） -->
+        <div class="banner-col">
+          <el-carousel height="360px" arrow="hover" :interval="5000">
+            <el-carousel-item v-for="b in banners" :key="b.id">
+              <div
+                class="banner-slide"
+                :style="bannerStyle(b)"
+                :class="{ clickable: !!b.linkUrl }"
+                @click="goBanner(b)"
+              >
+                <div class="banner-text">
+                  <h2>{{ b.title }}</h2>
+                  <p v-if="b.subTitle">{{ b.subTitle }}</p>
+                  <button v-if="b.linkUrl" class="banner-cta" type="button" @click.stop="goBanner(b)">
+                    立即选购
+                  </button>
+                </div>
+                <div class="banner-dots">
+                  <span v-for="n in banners.length" :key="n" class="dot" />
+                </div>
+              </div>
+            </el-carousel-item>
+          </el-carousel>
+        </div>
+
+        <!-- 右：公告 + 热销榜 -->
+        <div class="side-col">
+          <div class="notice-card">
+            <div class="notice-head">服务公告</div>
+            <ul class="notice-list">
+              <li>满 99 元免运费</li>
+              <li>正版保障 假一赔十</li>
+              <li>7 天无理由退换</li>
+              <li>订单满 199 元加赠书签</li>
+            </ul>
+          </div>
+
+          <div class="rank-card">
+            <div class="rank-head">
+              <span class="rank-head-title">热销榜</span>
+              <el-button link size="small" :icon="Download" @click="exportHotRank">
+                导出
+              </el-button>
+            </div>
+            <ol class="rank-list">
+              <li
+                v-for="(book, idx) in hotBooks.slice(0, 7)"
+                :key="book.id"
+                class="rank-item"
+                @click="goBook(book.id)"
+              >
+                <span
+                  class="rank-no"
+                  :style="{ background: rankColors[idx] || '#cccccc' }"
+                >{{ idx + 1 }}</span>
+                <span class="rank-title-text text-ellipsis">{{ book.title }}</span>
+                <span class="rank-price">{{ formatPrice(book.price) }}</span>
+              </li>
+            </ol>
+          </div>
+        </div>
       </div>
+
+      <!-- ===== 限时特惠 ===== -->
+      <section v-if="deals.length" class="deal-strip">
+        <div class="deal-head">
+          <div class="deal-title">
+            <span class="deal-flag">限时特惠</span>
+            <span class="deal-sub">每日 0 点更新 · 低至 5 折</span>
+          </div>
+          <div class="deal-clock">
+            <span class="clock-label">距结束</span>
+            <span class="clock-num">{{ countdown }}</span>
+          </div>
+        </div>
+        <div class="deal-body">
+          <div
+            v-for="b in deals"
+            :key="b.id"
+            class="deal-item"
+            @click="goBook(b.id)"
+          >
+            <div class="deal-cover">
+              <img :src="b.coverUrl" :alt="b.title" loading="lazy" />
+              <span class="deal-tag">特价</span>
+            </div>
+            <p class="deal-name text-ellipsis-2">{{ b.title }}</p>
+            <p class="deal-price">{{ formatPrice(b.price) }}</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== 猜你喜欢（N6） ===== -->
+      <section v-if="recommend.length > 0" class="floor">
+        <div class="floor-aside">
+          <div class="floor-title">
+            <h2>猜你喜欢</h2>
+            <span class="floor-sub">{{ recommendSub }}</span>
+          </div>
+          <div class="floor-links">
+            <a @click="router.push('/books?sort=sales')">热销图书</a>
+            <a @click="router.push('/books?sort=price_asc')">低价好书</a>
+            <a @click="router.push('/booklists')">编辑书单</a>
+          </div>
+          <a class="floor-more" @click="router.push('/books')">查看更多 ›</a>
+        </div>
+        <div class="floor-body">
+          <div class="book-grid">
+            <BookCard v-for="book in recommend" :key="book.id" :book="book" />
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== 分类楼层（N4） ===== -->
+      <section v-for="floor in floors" :key="floor.category.id" class="floor">
+        <div class="floor-aside">
+          <div class="floor-title">
+            <h2>{{ floor.category.name }}</h2>
+            <!-- 分类接口不返回 bookCount，这里不要写「0 本在售」 -->
+            <span class="floor-sub">按销量排序</span>
+          </div>
+          <div class="floor-links">
+            <a @click="router.push('/books?categoryId=' + floor.category.id + '&sort=sales')">
+              按销量排
+            </a>
+            <a @click="router.push('/books?categoryId=' + floor.category.id + '&sort=price_asc')">
+              价格从低到高
+            </a>
+            <a @click="router.push('/books?categoryId=' + floor.category.id + '&sort=price_desc')">
+              价格从高到低
+            </a>
+          </div>
+          <a class="floor-more" @click="router.push('/catalog?categoryId=' + floor.category.id)">
+            查看更多 ›
+          </a>
+        </div>
+        <div class="floor-body">
+          <div class="book-grid">
+            <BookCard v-for="book in floor.books" :key="book.id" :book="book" />
+          </div>
+        </div>
+      </section>
     </div>
-
-    <!-- 猜你喜欢（N6） -->
-    <section v-if="recommend.length > 0" class="floor">
-      <div class="floor-header">
-        <div class="floor-title">
-          <span class="floor-bar" />
-          <h2>猜你喜欢</h2>
-          <span class="floor-sub">{{ recommendSub }}</span>
-        </div>
-        <el-link type="primary" @click="router.push('/books')">查看更多 ›</el-link>
-      </div>
-      <div class="book-grid">
-        <BookCard v-for="book in recommend" :key="book.id" :book="book" />
-      </div>
-    </section>
-
-    <!-- 分类楼层（N4）：每个分类一层，按销量取前 5 -->
-    <section v-for="floor in floors" :key="floor.category.id" class="floor">
-      <div class="floor-header">
-        <div class="floor-title">
-          <span class="floor-bar" />
-          <h2>{{ floor.category.name }}</h2>
-          <span class="floor-sub">
-            {{ floor.category.bookCount || 0 }} 本在售 · 按销量排序
-          </span>
-        </div>
-        <el-link type="primary" @click="router.push('/catalog?categoryId=' + floor.category.id)">
-          查看更多 ›
-        </el-link>
-      </div>
-      <div class="book-grid">
-        <BookCard v-for="book in floor.books" :key="book.id" :book="book" />
-      </div>
-    </section>
   </div>
 </template>
 
 <style scoped>
-/* 首屏：两栏（Banner | 热销榜 280px） */
-.hero-row {
-  display: grid;
-  grid-template-columns: 1fr 280px;
-  gap: 20px;
-  margin-bottom: 36px;
+.home-page {
+  padding: 10px 0 30px;
 }
 
-.banner-wrap {
-  border-radius: var(--radius-md);
+/* ===== 首屏三栏 ===== */
+.first-screen {
+  display: grid;
+  grid-template-columns: 220px 1fr 240px;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+/* ---- 分类树 ---- */
+.cat-tree {
+  background: #fff;
+  border: 1px solid var(--border);
+  height: 360px;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  box-shadow: var(--shadow-sm);
+}
+
+.cat-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  border-bottom: 1px dashed var(--border-light);
+}
+
+.cat-item:last-child {
+  border-bottom: none;
+}
+
+.cat-item:hover {
+  background: var(--brand-weak);
+  color: var(--brand);
+}
+
+.cat-arrow {
+  color: var(--text-placeholder);
+}
+
+.cat-item:hover .cat-arrow {
+  color: var(--brand);
+}
+
+.cat-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-sub);
+}
+
+/* ---- 轮播 ---- */
+.banner-col {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #fff;
 }
 
 .banner-slide {
@@ -337,7 +549,7 @@ async function exportHotRank() {
   height: 100%;
   display: flex;
   align-items: center;
-  padding: 0 60px;
+  padding: 0 50px;
   color: #fff;
   position: relative;
 }
@@ -351,60 +563,138 @@ async function exportHotRank() {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0));
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0));
   pointer-events: none;
 }
 
 .banner-text {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   position: relative;
   z-index: 1;
 }
 
 .banner-text h2 {
-  font-size: 40px;
+  font-size: 34px;
   font-weight: 700;
   margin: 0;
   letter-spacing: 2px;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
 .banner-text p {
-  font-size: 18px;
-  opacity: 0.9;
+  font-size: 16px;
+  opacity: 0.92;
   margin: 0;
 }
 
-/* 热销榜卡片 */
-.rank-card {
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  height: 360px;
+.banner-cta {
+  align-self: flex-start;
+  margin-top: 6px;
+  padding: 7px 22px;
+  background: #fff;
+  color: var(--brand);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
-.rank-title {
+.banner-cta:hover {
+  background: var(--brand);
+  color: #fff;
+}
+
+/* 装饰性页码点：只做氛围，不接管点击（关掉 pointer 让轮播箭头正常工作） */
+.banner-dots {
+  position: absolute;
+  right: 20px;
+  bottom: 16px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-weight: 600;
-  font-size: 15px;
-  margin-bottom: 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border-light);
+  gap: 5px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.banner-dots .dot {
+  width: 18px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.banner-dots .dot:first-child {
+  background: #fff;
+}
+
+/* ---- 右栏 ---- */
+.side-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.notice-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  padding: 10px 12px;
   flex-shrink: 0;
 }
 
-.rank-title-left {
+.notice-head {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: 8px;
+}
+
+.notice-list li {
+  font-size: 12px;
+  color: var(--text-regular);
+  line-height: 20px;
+  padding-left: 10px;
+  position: relative;
+}
+
+.notice-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 3px;
+  height: 3px;
+  background: var(--brand);
+}
+
+.rank-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.rank-head {
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--brand);
+  margin-bottom: 6px;
+}
+
+.rank-head-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
 }
 
 .rank-list {
-  padding: 0;
   flex: 1;
   overflow: hidden;
 }
@@ -412,101 +702,237 @@ async function exportHotRank() {
 .rank-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 7px 0;
+  gap: 6px;
+  padding: 5px 0;
   cursor: pointer;
   border-bottom: 1px dashed var(--border-light);
-  transition: background 0.15s;
-}
-
-.rank-item:hover {
-  background: var(--bg-fill);
-  border-radius: 4px;
 }
 
 .rank-item:last-child {
   border-bottom: none;
 }
 
-.rank-no {
-  width: 22px;
-  height: 22px;
-  border-radius: 4px;
-  background: #dcdfe6;
-  font-size: 12px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+.rank-item:hover .rank-title-text {
+  color: var(--brand);
 }
 
-.rank-info {
-  flex: 1;
-  min-width: 0;
+.rank-no {
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  text-align: center;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
 }
 
 .rank-title-text {
-  font-size: 13px;
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
   color: var(--text-primary);
-  margin-bottom: 2px;
-}
-
-.rank-author {
-  font-size: 11px;
-  color: var(--text-sub);
 }
 
 .rank-price {
-  font-size: 13px;
-  color: var(--brand);
-  font-weight: 600;
   flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--brand);
 }
 
-/* 板块通用 */
-.floor {
-  margin-bottom: 36px;
+/* ===== 限时特惠 ===== */
+.deal-strip {
+  background: #fff;
+  border: 1px solid var(--border);
+  margin-bottom: 10px;
 }
 
-.floor-header {
+.deal-head {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 18px;
-  padding-bottom: 12px;
-  border-bottom: 2px solid var(--brand);
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-light);
 }
 
-.floor-title {
+.deal-title {
   display: flex;
   align-items: baseline;
   gap: 10px;
 }
 
-.floor-bar {
-  display: inline-block;
-  width: 4px;
-  height: 20px;
-  background: var(--brand);
-  border-radius: 2px;
+.deal-flag {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--brand);
 }
 
-.floor-title h2 {
-  font-size: 20px;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.floor-sub {
+.deal-sub {
   font-size: 12px;
   color: var(--text-sub);
 }
 
-/* 5 列网格 */
-.book-grid {
+.deal-clock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-regular);
+}
+
+.clock-num {
+  background: var(--text-primary);
+  color: #fff;
+  font-family: Consolas, Monaco, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 2px 6px;
+  letter-spacing: 1px;
+}
+
+.deal-body {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 16px;
+  gap: 10px;
+  padding: 10px;
+}
+
+.deal-item {
+  cursor: pointer;
+  padding: 6px;
+  border: 1px solid transparent;
+  transition: border-color 0.15s;
+}
+
+.deal-item:hover {
+  border-color: var(--brand);
+}
+
+.deal-cover {
+  position: relative;
+  /* 书封基本是 3:4，容器跟着书封比例走，5 张封面才对得齐 */
+  aspect-ratio: 3 / 4;
+  background: #fff;
+  overflow: hidden;
+  margin-bottom: 6px;
+  border: 1px solid var(--border-light);
+}
+
+/* 书封是竖版，裁成方图会把书名切掉，用 contain 留白反而更像"书" */
+.deal-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.deal-tag {
+  position: absolute;
+  left: 0;
+  top: 0;
+  background: var(--brand);
+  color: #fff;
+  font-size: 11px;
+  padding: 1px 6px;
+}
+
+.deal-name {
+  font-size: 12px;
+  color: var(--text-primary);
+  line-height: 18px;
+  height: 36px;
+}
+
+.deal-price {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--brand);
+  margin-top: 4px;
+}
+
+/* ===== 响应式 ===== */
+@media (max-width: 1199px) {
+  .first-screen {
+    grid-template-columns: 200px 1fr;
+  }
+  .side-col {
+    display: none;
+  }
+  .deal-body {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 991px) {
+  .first-screen {
+    grid-template-columns: 1fr;
+  }
+  .cat-tree {
+    display: none;
+  }
+  .deal-body {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+</style>
+
+<style>
+/* 分类树二级面板被 teleport 到 body，scoped 够不着 */
+.cat-popover {
+  padding: 10px 12px !important;
+}
+
+.cat-popover .pop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.cat-popover .pop-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.cat-popover .pop-more {
+  font-size: 12px;
+  color: var(--brand);
+  cursor: pointer;
+}
+
+.cat-popover .pop-book {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.cat-popover .pop-book:hover {
+  background: var(--brand-weak);
+}
+
+.cat-popover .pop-book-title {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-regular);
+}
+
+.cat-popover .pop-book-price {
+  flex-shrink: 0;
+  color: var(--brand);
+  font-weight: 600;
+}
+
+.cat-popover .pop-empty {
+  padding: 14px 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-sub);
 }
 </style>

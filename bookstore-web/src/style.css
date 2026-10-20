@@ -13,11 +13,12 @@ body,
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
-    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-  font-size: 14px;
-  color: #1f2126;
-  background-color: #f4f5f7;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', 'Segoe UI', sans-serif;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #333;
+  background-color: var(--bg-page);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -36,32 +37,83 @@ img {
   max-width: 100%;
 }
 
-/* ========== 主题色（低饱和柔和红体系） ========== */
+/* ========== 设计 token（暂见 DESIGN.md §2） ==========
+ * 当当风格：红只给价格与主操作，橙只给导航与购物车；
+ * 层次靠 1px 边框与底色对比建立，不靠阴影。
+ */
 :root {
-  --brand: #b9554e;
-  --brand-dark: #9a413b;
-  --brand-weak: #f8eceb;
-  --text-primary: #1f2126;
-  --text-regular: #4e5259;
-  --text-sub: #8c9099;
-  --text-placeholder: #c0c4cc;
-  --bg-page: #f4f5f7;
+  --brand: #ff2832;
+  --brand-dark: #e6162d;
+  --brand-weak: #fff1f0;
+  --orange: #ff6f00;
+  --orange-light: #ff8f00;
+  --orange-dark: #e65f00;
+
+  --text-primary: #333333;
+  --text-regular: #666666;
+  --text-sub: #999999;
+  --text-placeholder: #bbbbbb;
+
+  --bg-page: #f5f5f5;
   --bg-card: #ffffff;
-  --bg-fill: #f4f5f7;
-  --border: #edeeef;
-  --border-light: #f0f1f3;
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
-  --header-height: 64px;
+  --bg-fill: #f7f7f7;
+
+  --border: #e5e5e5;
+  --border-light: #f0f0f0;
+
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 4px;
+
+  /* 只有两级：静态卡片无阴影，hover/浮层才有一层 */
+  --shadow-sm: none;
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 2px 12px rgba(0, 0, 0, 0.16);
+
+  --header-height: 132px;
   --sidebar-width: 200px;
-  --content-max: 1280px;
+  --content-max: 1200px;
+
+  /* Element Plus 主色令牌：让 el-* 组件自动跟随红色体系，
+     不必逐个组件写覆盖（此前只覆盖了按钮/复选/单选，标签、开关、滑块都还是 EP 蓝） */
+  --el-color-primary: #ff2832;
+  --el-color-primary-light-3: #ff686f;
+  --el-color-primary-light-5: #ff9499;
+  --el-color-primary-light-7: #ffbfc2;
+  --el-color-primary-light-8: #ffd4d6;
+  --el-color-primary-light-9: #ffeaea;
+  --el-color-primary-dark-2: #cc2028;
+  --el-border-radius-base: 2px;
+  --el-font-size-base: 12px;
 }
 
-/* ========== 覆盖 Element Plus 主色 ========== */
+/* ========== 布局容器 ========== */
+.container {
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* 内容页容器（其余页面沿用，保持视觉连续） */
+.page-container {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+/* ========== Element Plus 覆盖（主色已由 :root 令牌接管，这里只补个别细节） ========== */
+.el-button {
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
 .el-button--primary {
   --el-button-bg-color: var(--brand);
   --el-button-border-color: var(--brand);
@@ -71,51 +123,32 @@ img {
   --el-button-active-border-color: var(--brand-dark);
 }
 
-.el-checkbox__input.is-checked .el-checkbox__inner,
-.el-checkbox__input.is-indeterminate .el-checkbox__inner {
-  background-color: var(--brand);
-  border-color: var(--brand);
+.el-input__wrapper,
+.el-textarea__inner,
+.el-select__wrapper {
+  border-radius: var(--radius-sm);
 }
 
-.el-checkbox__input.is-checked + .el-checkbox__label {
+.el-tabs__item {
+  font-size: 13px;
+}
+
+.el-tabs--border-card > .el-tabs__header .el-tabs__item.is-active {
   color: var(--brand);
 }
 
-.el-radio__input.is-checked .el-radio__inner {
-  border-color: var(--brand);
-  background: var(--brand);
+.el-card {
+  border-radius: var(--radius-sm);
+  border-color: var(--border);
 }
 
-.el-radio__input.is-checked + .el-radio__label {
-  color: var(--brand);
-}
-
-.el-tabs__item.is-active,
-.el-tabs__item:hover {
-  color: var(--brand);
-}
-
-.el-tabs__active-bar {
-  background-color: var(--brand);
-}
-
-.el-pagination.is-background .el-pager li.is-active {
-  background-color: var(--brand);
+.el-table th.el-table__cell {
+  background: var(--bg-fill);
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 /* ========== 通用工具类 ========== */
-.page-container {
-  max-width: var(--content-max);
-  margin: 0 auto;
-  padding: 20px;
-}
-
-.card {
-  background: var(--bg-card);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-}
-
 .flex {
   display: flex;
 }
@@ -137,9 +170,10 @@ img {
   overflow: hidden;
 }
 
+/* 价格：货币符号由 formatPrice() 统一加，样式里不要再补一个 ¥ */
 .price {
   color: var(--brand);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .price-original {
@@ -159,4 +193,134 @@ img {
 }
 .mb-16 {
   margin-bottom: 16px;
+}
+
+/* ========== 楼层（首页与分类页共用） ==========
+ * 所有选择器都嵌套在 .floor / .floor-aside / .floor-body 之内：
+ * 「详情页-同类推荐」也有一个叫 .floor-title 的 div，裸写会把它一起染上红条和底线。
+ */
+.floor {
+  display: flex;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+
+/* 左栏贴边、底色区分，做出"书架隔板"的观感 */
+.floor-aside {
+  width: 160px;
+  flex-shrink: 0;
+  background: var(--bg-fill);
+  border-right: 1px solid var(--border);
+  padding: 16px 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.floor-aside .floor-title {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* 全站唯一的装饰性元素：红色竖条 */
+.floor-aside .floor-title::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 3px;
+  width: 3px;
+  height: 18px;
+  background: var(--brand);
+}
+
+.floor-aside .floor-title h2 {
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.floor .floor-sub {
+  font-size: 12px;
+  color: var(--text-sub);
+}
+
+.floor-links {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-regular);
+}
+
+.floor-links a {
+  cursor: pointer;
+}
+
+.floor-links a:hover {
+  color: var(--brand);
+  text-decoration: underline;
+}
+
+.floor-more {
+  margin-top: auto;
+  padding-top: 10px;
+  font-size: 12px;
+  color: var(--brand);
+  cursor: pointer;
+}
+
+.floor-more:hover {
+  text-decoration: underline;
+}
+
+.floor-body {
+  flex: 1;
+  min-width: 0;
+  padding: 10px;
+}
+
+.floor-body {
+  flex: 1;
+  min-width: 0;
+  padding: 10px;
+}
+
+/* 5 列网格，行列间距一致（电商要的是密度，行距大于列距是浪费） */
+.book-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+
+@media (max-width: 1199px) {
+  .book-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 991px) {
+  .book-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 767px) {
+  .book-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .floor {
+    flex-direction: column;
+  }
+  .floor-aside {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
 }

@@ -9,8 +9,14 @@ import { useHistoryStore } from '@/stores/history'
 import { useFreightStore } from '@/stores/freight'
 
 const route = useRoute()
-// 首页也显示面包屑（只有 1 项也展示）
-const showBreadcrumb = computed(() => Array.isArray(route.meta?.breadcrumb) && route.meta.breadcrumb.length >= 1)
+// 首页首屏自带分类树、商品目录页自带分类页签，这两页再挂侧栏就是同一个东西出现两次
+// （还白占 200px）；其余页面没有分类入口，侧栏保留
+const NO_SIDEBAR = ['Home', 'Catalog']
+const showSidebar = computed(() => !NO_SIDEBAR.includes(route.name))
+// 首页不显示面包屑（只有「首页」一项，等于没有），其余页面 meta 有配置才显示
+const showBreadcrumb = computed(
+  () => route.name !== 'Home' && Array.isArray(route.meta?.breadcrumb) && route.meta.breadcrumb.length >= 1
+)
 
 /**
  * 登录态变化时同步浏览历史。
@@ -46,7 +52,7 @@ watch(
   <div class="layout">
     <AppHeader />
     <div class="layout-body">
-      <AppSidebar />
+      <AppSidebar v-if="showSidebar" />
       <main class="layout-main">
         <!-- 面包屑 -->
         <div v-if="showBreadcrumb" class="breadcrumb-bar">

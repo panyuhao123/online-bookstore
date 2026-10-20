@@ -66,9 +66,18 @@ const activePriceRange = ref(0)
 const activeCategory = computed(
   () => categories.value.find((c) => String(c.id) === String(activeCategoryId.value)) || null
 )
-const allBookCount = computed(() =>
-  categories.value.reduce((sum, c) => sum + (Number(c.bookCount) || 0), 0)
-)
+
+/**
+ * `/api/category/list` 只返回 `{id,name,sort}`，**没有 `bookCount`**。
+ *
+ * <p>此前这里把各类的 `bookCount` 累加当"全店图书数"，页签上也逐类显示
+ * `cat.bookCount || 0`，接口没有该字段 → 页面上写的是「全店 0 本图书」「小说 0」，
+ * 而右侧分页信息又写着「共 102 本」，同一屏两个互相打架的数字。
+ *
+ * <p>处置：本页不猜数。页签上的书目数只在后端真的给了 `bookCount` 时才渲染
+ * （`v-if`），否则整段不显示；全店总数交给右侧分页信息（那是 `pageBooks` 的
+ * `total`，唯一可信来源）。要真正补上分类书目数需要后端 VO 加字段，已记入待办。
+ */
 
 async function loadCategories() {
   categoryLoading.value = true
@@ -196,7 +205,7 @@ watch(
         <template v-if="activeCategory">
           「{{ activeCategory.name }}」共 {{ total }} 本
         </template>
-        <template v-else> 全店 {{ categories.length }} 个分类、{{ allBookCount }} 本图书 </template>
+        <template v-else> 全店 {{ categories.length }} 个分类 </template>
       </p>
     </div>
 
@@ -208,7 +217,6 @@ watch(
         @click="setCategory(null)"
       >
         全部图书
-        <em class="cnt">{{ allBookCount }}</em>
       </span>
       <span
         v-for="cat in categories"
@@ -218,7 +226,7 @@ watch(
         @click="setCategory(cat.id)"
       >
         {{ cat.name }}
-        <em class="cnt">{{ cat.bookCount || 0 }}</em>
+        <em v-if="cat.bookCount" class="cnt">{{ cat.bookCount }}</em>
       </span>
     </div>
 

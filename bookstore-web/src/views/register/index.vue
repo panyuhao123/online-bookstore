@@ -111,7 +111,8 @@ async function onSubmit() {
 <style scoped>
 .register-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #c8362f 0%, #8e2a24 100%);
+  /* 与登录页同一套淡暖底，避免两页之间跳转变色 */
+  background: linear-gradient(135deg, #fff7f5 0%, #ffe9e3 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -122,7 +123,9 @@ async function onSubmit() {
   padding: 40px 36px;
   width: 100%;
   max-width: 480px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  /* 淡底上的白卡需要一层阴影才浮得起来，否则边界糊在一起 */
+  box-shadow: 0 6px 24px rgba(180, 60, 40, 0.12);
+  border: 1px solid var(--border);
 }
 
 .register-header {

@@ -28,6 +28,11 @@ request.interceptors.request.use(
 
 request.interceptors.response.use(
   (response) => {
+    // 文件下载（responseType: 'blob'）直接放行：二进制流没有 {code, data} 结构，
+    // 走下面的业务码判断会被当成「请求失败」
+    if (response.config && response.config.responseType === 'blob') {
+      return response
+    }
     const body = response.data
     // 后端保证 HTTP 恒 200，因此这里只处理业务逻辑
     if (body && body.code === 200) {

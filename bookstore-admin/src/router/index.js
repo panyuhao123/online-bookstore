@@ -39,6 +39,12 @@ const routes = [
         meta: { title: '分类管理', icon: 'Menu' }
       },
       {
+        path: 'banner',
+        name: 'Banner',
+        component: () => import('@/views/banner/index.vue'),
+        meta: { title: '轮播图管理', icon: 'Picture' }
+      },
+      {
         path: 'order',
         name: 'Order',
         component: () => import('@/views/order/index.vue'),
@@ -55,6 +61,18 @@ const routes = [
         name: 'User',
         component: () => import('@/views/user/index.vue'),
         meta: { title: '用户管理', icon: 'User' }
+      },
+      {
+        path: 'booklist',
+        name: 'Booklist',
+        component: () => import('@/views/booklist/index.vue'),
+        meta: { title: '书单管理', icon: 'Collection' }
+      },
+      {
+        path: 'stock-notice',
+        name: 'StockNotice',
+        component: () => import('@/views/stock-notice/index.vue'),
+        meta: { title: '到货提醒', icon: 'Bell' }
       },
       {
         path: 'log',

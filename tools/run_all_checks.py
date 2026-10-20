@@ -48,6 +48,8 @@
     check_app_sfc.cjs                              随 --with-frontend 跑（APP 的 SFC 静态检查）
     verify_web_pc.cjs                              随 --with-web 跑（PC 商城端到端，需 Chrome；
                                                    未起 Web dev server 时脚本会自动拉起 5176）
+    verify_admin_ui.cjs                            随 --with-admin-ui 跑（管理端 UI 端到端，需 Chrome；
+                                                   未起管理端 dev server 时脚本会自动拉起 5173）
     check_grid_styles.cjs / verify_web_guard|interaction|search.cjs
                                                    面向 APP H5（5175），本脚本不自动拉起该实例
     bench_cache.py / probe_openapi_docs.py          汇报型工具，不产出断言
@@ -75,12 +77,16 @@ ROOT = Path(__file__).resolve().parent.parent
 TOOLS = ROOT / "tools"
 SERVER_DIR = ROOT / "bookstore-server"
 WEB_DIR = ROOT / "bookstore-web"
+ADMIN_DIR = ROOT / "bookstore-admin"
 OUT_DIR = TOOLS / "out"
 SERVER_LOG = SERVER_DIR / "run_all_checks_server.log"
 WEB_LOG = WEB_DIR / "run_all_checks_web.log"
+ADMIN_UI_LOG = ADMIN_DIR / "run_all_checks_admin_ui.log"
 
 WEB_PORT = 5176
 WEB_URL = "http://localhost:%d" % WEB_PORT
+ADMIN_PORT = 5173
+ADMIN_URL = "http://localhost:%d" % ADMIN_PORT
 
 DEFAULT_BASE = os.environ.get("BOOKSTORE_BASE", "http://127.0.0.1:8080")
 DEFAULT_PORT = 8080
@@ -199,6 +205,12 @@ CJS_CHECKS = [
 WEB_CHECKS = [
     ("verify_web_pc.cjs",
      "PC 商城端到端：官方书单 / 排序透传 / 检索翻页 / 对比栏同步 / 购物车批量 / 立即购买", 0),
+]
+
+# 管理端 UI 端到端：需要后端服务 + 管理端 dev server(5173) + 本机 Chrome（用 --with-admin-ui 开启）
+ADMIN_UI_CHECKS = [
+    ("verify_admin_ui.cjs",
+     "管理端 UI 端到端：轮播图增删 / 书单治理与详情 / 到货提醒 / 运费规则读写", 0),
 ]
 
 INFRA = [
@@ -346,37 +358,37 @@ def npm_cmd() -> list[str] | None:
     return exe_cmd(exe) if exe else None
 
 
-def start_web() -> subprocess.Popen | None:
-    """拉起 PC 商城 dev server（vite，端口固定 5176，/api 与 /files 反代到 8080）。"""
-    if not (WEB_DIR / "package.json").exists():
+def start_dev_server(project_dir, log_path, name: str) -> subprocess.Popen | None:
+    """拉起 vite dev server（npm run dev）；端口由各项目 vite.config.js 固定，不在这里指定。"""
+    if not (project_dir / "package.json").exists():
         return None
     cmd = npm_cmd()
     if cmd is None:
         return None
     args = cmd + ["run", "dev"]
-    log("  启动：%s（cwd=%s）" % (" ".join(args), WEB_DIR.relative_to(ROOT)))
-    log("  日志：%s" % WEB_LOG.relative_to(ROOT))
-    fh = open(WEB_LOG, "w", encoding="utf-8", errors="replace")
+    log("  启动 %s：%s（cwd=%s）" % (name, " ".join(args), project_dir.relative_to(ROOT)))
+    log("  日志：%s" % log_path.relative_to(ROOT))
+    fh = open(log_path, "w", encoding="utf-8", errors="replace")
     env = dict(os.environ, PYTHONIOENCODING="utf-8")
-    return subprocess.Popen(args, cwd=str(WEB_DIR), stdout=fh, stderr=subprocess.STDOUT, env=env)
+    return subprocess.Popen(args, cwd=str(project_dir), stdout=fh, stderr=subprocess.STDOUT, env=env)
 
 
-def wait_web_ready(timeout: int = 120) -> bool:
-    log("  等待 Web dev server 就绪（探测 %s，最多 %ds）…" % (WEB_URL, timeout))
+def wait_dev_ready(url: str, name: str, timeout: int = 120) -> bool:
+    log("  等待 %s 就绪（探测 %s，最多 %ds）…" % (name, url, timeout))
     deadline = time.time() + timeout
     while time.time() < deadline:
-        if http_ok(WEB_URL, timeout=3.0):
+        if http_ok(url, timeout=3.0):
             log("  就绪，用时 %ds" % int(timeout - (deadline - time.time())))
             return True
         time.sleep(2)
     return False
 
 
-def tail_web_log(lines: int = 20) -> None:
-    if not WEB_LOG.exists():
+def tail_dev_log(log_path, name: str, lines: int = 20) -> None:
+    if not log_path.exists():
         return
-    content = WEB_LOG.read_text(encoding="utf-8", errors="replace").splitlines()
-    log("  —— Web dev server 日志末尾 %d 行 ——" % lines)
+    content = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+    log("  —— %s 日志末尾 %d 行 ——" % (name, lines))
     for line in content[-lines:]:
         log("    " + line.rstrip())
 
@@ -481,6 +493,8 @@ def main() -> int:
     ap.add_argument("--with-frontend", action="store_true", help="附带执行前端静态检查（check_app_sfc.cjs）")
     ap.add_argument("--with-web", action="store_true",
                     help="附带执行 PC 商城端到端（verify_web_pc.cjs，需 Chrome；未起 dev server 时自动拉起 5176）")
+    ap.add_argument("--with-admin-ui", action="store_true", dest="with_admin_ui",
+                    help="附带执行管理端 UI 端到端（verify_admin_ui.cjs，需 Chrome；未起 dev server 时自动拉起 5173）")
     ap.add_argument("--no-cleanup", action="store_true", help="跑完不停止自己拉起的服务")
     ap.add_argument("--verbose", action="store_true", help="完整回显每个脚本的输出")
     ap.add_argument("--timeout", type=int, default=600, help="单个检查的超时秒数（默认 600）")
@@ -581,11 +595,11 @@ def main() -> int:
             if reuse_web:
                 log("  复用已在运行的 Web dev server :%d（PID %s）" % (WEB_PORT, pid_listening(WEB_PORT)))
             else:
-                web_proc = start_web()
+                web_proc = start_dev_server(WEB_DIR, WEB_LOG, "PC 商城 dev server")
                 if web_proc is None:
                     log("  !! 无法启动 Web dev server（找不到 npm 或 bookstore-web/package.json），跳过")
             if reuse_web or web_proc is not None:
-                if wait_web_ready():
+                if wait_dev_ready(WEB_URL, "Web dev server"):
                     for script, desc, expect_fail in WEB_CHECKS:
                         if only and Path(script).stem not in only:
                             continue
@@ -597,7 +611,38 @@ def main() -> int:
                         log_result(out)
                 else:
                     log("  !! Web dev server 未在超时内就绪，跳过 PC 商城检查")
-                    tail_web_log()
+                    tail_dev_log(WEB_LOG, "Web dev server")
+
+    # ---- 管理端 UI 端到端（需管理端 dev server；必须放在停服之前） ---- #
+    admin_ui_proc: subprocess.Popen | None = None
+    if opt.with_admin_ui:
+        rule("六、管理端 UI 端到端检查（需 Chrome + 管理端 dev server）")
+        node = shutil.which("node")
+        if not node:
+            log("  !! 找不到 node，跳过")
+        else:
+            reuse_admin = port_open("127.0.0.1", ADMIN_PORT)
+            if reuse_admin:
+                log("  复用已在运行的管理端 dev server :%d（PID %s）"
+                    % (ADMIN_PORT, pid_listening(ADMIN_PORT)))
+            else:
+                admin_ui_proc = start_dev_server(ADMIN_DIR, ADMIN_UI_LOG, "管理端 dev server")
+                if admin_ui_proc is None:
+                    log("  !! 无法启动管理端 dev server（找不到 npm 或 bookstore-admin/package.json），跳过")
+            if reuse_admin or admin_ui_proc is not None:
+                if wait_dev_ready(ADMIN_URL, "管理端 dev server"):
+                    for script, desc, expect_fail in ADMIN_UI_CHECKS:
+                        if only and Path(script).stem not in only:
+                            continue
+                        log()
+                        log("  >>> %s —— %s" % (script, desc))
+                        out = run_cmd(script, desc, [node, str(TOOLS / script)], ROOT, env,
+                                      parse_cjs, expect_fail, max(opt.timeout, 420), opt.verbose)
+                        results.append(out)
+                        log_result(out)
+                else:
+                    log("  !! 管理端 dev server 未在超时内就绪，跳过管理端 UI 检查")
+                    tail_dev_log(ADMIN_UI_LOG, "管理端 dev server")
 
     # ---- 收尾服务（单测要与 spring-boot:run 争 target/，必须先停） ---- #
     if web_proc is not None:
@@ -606,8 +651,14 @@ def main() -> int:
             log("  已停止自拉起的 Web dev server（PID %s 及其子进程）" % web_proc.pid)
         else:
             log("  !! Web dev server 停止失败，请手工检查 :%d" % WEB_PORT)
+    if admin_ui_proc is not None:
+        if kill_tree(admin_ui_proc.pid):
+            log()
+            log("  已停止自拉起的管理端 dev server（PID %s 及其子进程）" % admin_ui_proc.pid)
+        else:
+            log("  !! 管理端 dev server 停止失败，请手工检查 :%d" % ADMIN_PORT)
     if own_server and not opt.no_cleanup:
-        rule("六、收尾：停止自拉起的服务")
+        rule("七、收尾：停止自拉起的服务")
         if kill_tree(proc.pid):
             log("  已停止（PID %s 及其子进程）" % proc.pid)
         else:
@@ -616,7 +667,7 @@ def main() -> int:
 
     # ---- 单元测试（需要 target/ 空闲） ---- #
     if opt.with_unit:
-        rule("七、后端单元测试（mvn test）")
+        rule("八、后端单元测试（mvn test）")
         if opt.reuse_server:
             log("  ⚠ 你用了 --reuse-server：若该实例仍在运行，mvn test 会与它争用 target/。")
             log("    建议先停掉外部实例，或去掉 --reuse-server 让本脚本自己管理服务。")
@@ -632,7 +683,7 @@ def main() -> int:
 
     # ---- 管理端单元测试（vitest） ---- #
     if opt.with_admin:
-        rule("八、管理端单元测试（vitest）")
+        rule("九、管理端单元测试（vitest）")
         admin_dir = ROOT / "bookstore-admin"
         npm = shutil.which("npm")
         if only and "admin" not in only:

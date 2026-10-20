@@ -18,6 +18,10 @@
           <el-icon><Menu /></el-icon>
           <span>分类管理</span>
         </el-menu-item>
+        <el-menu-item index="/banner">
+          <el-icon><Picture /></el-icon>
+          <span>轮播图管理</span>
+        </el-menu-item>
         <el-menu-item index="/order">
           <el-icon><Tickets /></el-icon>
           <span>订单管理</span>
@@ -29,6 +33,14 @@
         <el-menu-item index="/user">
           <el-icon><User /></el-icon>
           <span>用户管理</span>
+        </el-menu-item>
+        <el-menu-item index="/booklist">
+          <el-icon><Collection /></el-icon>
+          <span>书单管理</span>
+        </el-menu-item>
+        <el-menu-item index="/stock-notice">
+          <el-icon><Bell /></el-icon>
+          <span>到货提醒</span>
         </el-menu-item>
         <el-menu-item index="/log">
           <el-icon><Document /></el-icon>

@@ -12,7 +12,7 @@
 import { ref, computed } from 'vue'
 
 /** 宽屏断点（px） */
-export const WIDE_MIN = 960
+const WIDE_MIN = 960
 
 /**
  * 桌面顶栏总高度（px）：顶部窄条 36 + 主导航条 76。

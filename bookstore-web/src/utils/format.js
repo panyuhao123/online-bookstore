@@ -1,5 +1,5 @@
 /** 金额格式化：分/元统一保留两位小数 */
-export function formatMoney(value) {
+function formatMoney(value) {
   if (value === null || value === undefined || value === '') return '0.00'
   const num = Number(value)
   if (isNaN(num)) return '0.00'
@@ -11,8 +11,8 @@ export function formatPrice(value) {
   return '¥' + formatMoney(value)
 }
 
-/** 订单状态码 -> 中文文案 */
-export const ORDER_STATUS_TEXT = {
+/** 订单状态码 -> 中文文案（仅本文件兜底用，正常路径取后端 statusText） */
+const ORDER_STATUS_TEXT = {
   1: '待支付',
   2: '已支付',
   3: '已发货',

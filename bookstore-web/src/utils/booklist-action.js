@@ -23,7 +23,7 @@ function isCancel(e) {
  * <p>图书对象在不同页面长得不一样：列表页是 `BookVO`（主键 `id`），
  * 购物车行是 `CartVO`（主键 `id`，图书 id 在 `bookId`）。不统一的话每处都要记一遍字段名。
  */
-export function toBookIds(books) {
+function toBookIds(books) {
   return (books || [])
     .map((b) => b?.id ?? b?.bookId)
     .filter((id) => id !== undefined && id !== null)
@@ -35,7 +35,7 @@ export function toBookIds(books) {
  * <p>后端会跳过书单里已有的书并回传 `{added,total}`。如果无视它一律说"已加入 N 本"，
  * 用户会遇到"提示加成功、打开书单一本没多"的情况 —— 这是最招人烦的那类提示。
  */
-export function addedMessage(res, name) {
+function addedMessage(res, name) {
   const added = res?.added ?? 0
   const total = res?.total ?? added
   const target = name ? `「${name}」` : '书单'

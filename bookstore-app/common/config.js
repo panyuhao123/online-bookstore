@@ -14,13 +14,13 @@
  */
 
 // #ifdef H5
-export const DEFAULT_BASE_URL = 'http://127.0.0.1:8080'
+const DEFAULT_BASE_URL = 'http://127.0.0.1:8080'
 // #endif
 
 // #ifndef H5
 // 真机（APP）端必须填电脑的局域网 IP。
 // 查询当前 IP 请取 WLAN / 以太网那一行，排除 VMware 虚拟网卡（192.168.98.x / 192.168.109.x）。
-export const DEFAULT_BASE_URL = 'http://10.180.61.51:8080'
+const DEFAULT_BASE_URL = 'http://10.180.61.51:8080'
 // #endif
 
 /** 本地缓存键：避开 uni_ / dcloud_ 保留前缀 */
@@ -119,7 +119,7 @@ export async function autoDetectBaseUrl() {
 }
 
 /** 相对路径转完整 URL（后端返回的封面是 /files/... 相对路径） */
-export function fullUrl(path) {
+function fullUrl(path) {
   if (!path) return ''
   if (/^https?:\/\//.test(path)) return path
   return getBaseUrl() + path

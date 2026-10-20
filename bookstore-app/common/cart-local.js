@@ -91,12 +91,12 @@ export function removeLocalCart(bookId) {
 }
 
 /** 清空本地购物车 */
-export function clearLocalCart() {
+function clearLocalCart() {
   uni.removeStorageSync(CART_KEY)
 }
 
 /** 转成合并接口需要的入参格式 */
-export function toMergeItems() {
+function toMergeItems() {
   return getLocalCart().map((item) => ({ bookId: item.bookId, quantity: item.quantity }))
 }
 

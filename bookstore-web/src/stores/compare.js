@@ -3,7 +3,7 @@ import { defineStore } from 'pinia'
 import { ElMessage } from 'element-plus'
 import { getCompareList, setCompareList } from '@/utils/storage'
 
-export const COMPARE_MAX = 4
+const COMPARE_MAX = 4
 
 /**
  * 只保留对比需要的字段。

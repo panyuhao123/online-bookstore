@@ -20,13 +20,13 @@ export function rpx(v) {
 }
 
 /** 自绘导航行高（88rpx） */
-export const navRowHeight = rpx(88)
+const navRowHeight = rpx(88)
 
 /** 自绘导航总高 = 状态栏 + 行高 */
 export const navBarHeight = statusBarHeight + navRowHeight
 
 /** 底部安全区（全面屏手势条） */
-export const safeBottom = (sys.safeAreaInsets && sys.safeAreaInsets.bottom) || 0
+const safeBottom = (sys.safeAreaInsets && sys.safeAreaInsets.bottom) || 0
 
 /** 底部自绘 Tab 高度 = 100rpx + 安全区 */
 export const tabBarHeight = rpx(100) + safeBottom

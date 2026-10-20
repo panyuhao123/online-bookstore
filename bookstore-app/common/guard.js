@@ -21,7 +21,7 @@ import { isLogin } from '@/common/auth'
  */
 
 /** 当前页面路径（含查询参数，不带前导斜杠）；APP 端无 URL 概念，返回空串 */
-export function currentPath() {
+function currentPath() {
   // #ifdef H5
   return String(location.hash || '').replace(/^#\/?/, '')
   // #endif
@@ -34,7 +34,7 @@ export function currentPath() {
  * 只放行站内页面路径。
  * redirect 可能来自地址栏，不校验的话 ?redirect=http://... 会被拿去跳转。
  */
-export function safeRedirect(path) {
+function safeRedirect(path) {
   const p = String(path || '')
   return /^pages\/[A-Za-z0-9_\-/]+(\?[^\s]*)?$/.test(p) ? p : ''
 }

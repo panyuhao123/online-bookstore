@@ -15,3 +15,8 @@ export function updateReviewStatus(id, status) {
 export function deleteReview(id) {
   return request.delete('/api/admin/review/' + id)
 }
+
+/** 评价汇总指标：总数 / 正常 / 隐藏 / 平均分（平均分只算正常评价） */
+export function reviewSummary() {
+  return request.get('/api/admin/review/summary')
+}

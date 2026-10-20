@@ -5,13 +5,46 @@
       <el-button type="primary" :icon="Plus" @click="openCreate">新增图书</el-button>
     </div>
 
-    <div class="app-card">
-      <div class="app-toolbar">
+    <!-- ==================== 汇总条：先回答「有多少书、多少快断货」 ==================== -->
+    <div class="app-card statbar">
+      <div class="statbar__cell">
+        <span class="statbar__label">图书总数</span>
+        <b class="statbar__value num">{{ summary.total || 0 }}</b>
+        <span class="statbar__foot">含已下架</span>
+      </div>
+      <div class="statbar__cell">
+        <span class="statbar__label">上架中</span>
+        <b class="statbar__value num">{{ summary.onSale || 0 }}</b>
+        <span class="statbar__foot">前台可见</span>
+      </div>
+      <div class="statbar__cell">
+        <span class="statbar__label">已下架</span>
+        <b class="statbar__value num">{{ summary.offSale || 0 }}</b>
+        <span class="statbar__foot">不参与售卖</span>
+      </div>
+      <div class="statbar__cell">
+        <span class="statbar__label">库存告急</span>
+        <b class="statbar__value num" :class="{ 'is-alert': summary.lowStock > 0 }">
+          {{ summary.lowStock || 0 }}
+        </b>
+        <span class="statbar__foot">上架且 ≤ 5 册</span>
+      </div>
+      <div class="statbar__cell">
+        <span class="statbar__label">在库册数</span>
+        <b class="statbar__value num">{{ summary.totalStock || 0 }}</b>
+        <span class="statbar__foot">仅上架图书</span>
+      </div>
+    </div>
+
+    <!-- ==================== 筛选卡：关键词 + 分类 + 状态胶囊 ==================== -->
+    <div class="app-card filter">
+      <div class="filter__row">
         <el-input
           v-model="query.keyword"
           placeholder="书名 / 作者"
           clearable
           style="width: 200px"
+          :prefix-icon="Search"
           @keyup.enter="handleSearch"
           @clear="handleSearch"
         />
@@ -19,16 +52,47 @@
                    @change="handleSearch">
           <el-option v-for="c in categories" :key="c.id" :label="c.name" :value="c.id" />
         </el-select>
-        <el-select v-model="query.status" placeholder="全部状态" clearable style="width: 140px"
-                   @change="handleSearch">
-          <el-option label="上架中" :value="1" />
-          <el-option label="已下架" :value="0" />
-        </el-select>
         <el-button type="primary" :icon="Search" @click="handleSearch">查询</el-button>
         <el-button :icon="Refresh" @click="handleReset">重置</el-button>
       </div>
 
-      <el-table v-loading="loading" :data="list" border>
+      <div class="filter__row filter__row--status">
+        <span class="filter__label">状态</span>
+        <div class="chips">
+          <button
+            type="button"
+            class="chip"
+            :class="{ on: query.status === null }"
+            style="--dc: #6c4df2"
+            @click="pickStatus(null)"
+          >
+            <i></i>全部<b class="num">{{ summary.total || 0 }}</b>
+          </button>
+          <button
+            type="button"
+            class="chip"
+            :class="{ on: query.status === 1 }"
+            style="--dc: #1f9d63"
+            @click="pickStatus(1)"
+          >
+            <i></i>上架中<b class="num">{{ summary.onSale || 0 }}</b>
+          </button>
+          <button
+            type="button"
+            class="chip"
+            :class="{ on: query.status === 0 }"
+            style="--dc: #b4bac6"
+            @click="pickStatus(0)"
+          >
+            <i></i>已下架<b class="num">{{ summary.offSale || 0 }}</b>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 列表 ==================== -->
+    <div class="app-card">
+      <el-table v-loading="loading" :data="list" :border="false" class="list-table">
         <el-table-column label="封面" width="80">
           <template #default="{ row }">
             <el-image v-if="row.coverUrl" :src="fileUrl(row.coverUrl)" :preview-src-list="[fileUrl(row.coverUrl)]"
@@ -155,17 +219,19 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Refresh } from '@element-plus/icons-vue'
 import {
-  pageBooks, createBook, updateBook, updateBookStatus, deleteBook, uploadCover
+  pageBooks, createBook, updateBook, updateBookStatus, deleteBook, uploadCover, bookSummary
 } from '@/api/book'
 import { listCategories } from '@/api/category'
 import { fileUrl } from '@/utils/url'
 
 const MAX_SIZE_MB = 5
 
+const route = useRoute()
 const list = ref([])
 const categories = ref([])
 const loading = ref(false)
@@ -173,6 +239,7 @@ const submitting = ref(false)
 const dialogVisible = ref(false)
 const formRef = ref()
 const total = ref(0)
+const summary = ref({})
 
 const query = reactive({
   keyword: '',
@@ -216,6 +283,16 @@ async function load() {
 
 async function loadCategories() {
   categories.value = await listCategories().catch(() => [])
+}
+
+/** 汇总指标：失败时退化为空对象（页面显示 0），不阻断列表 */
+async function loadSummary() {
+  summary.value = (await bookSummary().catch(() => ({}))) || {}
+}
+
+function pickStatus(status) {
+  query.status = status
+  handleSearch()
 }
 
 function handleSearch() {
@@ -284,7 +361,8 @@ async function handleStatusChange(row, val) {
   try {
     await updateBookStatus(row.id, val)
     ElMessage.success(val === 1 ? '已上架' : '已下架')
-    load()
+    // 上下架直接改变「上架中 / 已下架」两个汇总数字，必须一起重读
+    await Promise.all([load(), loadSummary()])
   } catch (e) {
     // 失败时把开关回滚，避免界面与实际状态不一致
     row.status = val === 1 ? 0 : 1
@@ -300,7 +378,7 @@ function handleDelete(row) {
     .then(async () => {
       await deleteBook(row.id)
       ElMessage.success('删除成功')
-      load()
+      await Promise.all([load(), loadSummary()])
     })
     .catch(() => {})
 }
@@ -328,25 +406,33 @@ function handleSubmit() {
         ElMessage.success('新增成功')
       }
       dialogVisible.value = false
-      load()
+      await Promise.all([load(), loadSummary()])
     } finally {
       submitting.value = false
     }
   })
 }
 
+/**
+ * 顶栏全局搜索把关键词带进 query。同一路由只换 query 不会重新挂载组件，
+ * 不监听就会「地址栏变了、列表没变」。
+ */
+watch(
+  () => route.query.keyword,
+  (keyword) => {
+    query.keyword = keyword ? String(keyword) : ''
+    handleSearch()
+  }
+)
+
 onMounted(async () => {
   await loadCategories()
+  loadSummary()
   load()
 })
 </script>
 
 <style scoped>
-.pager {
-  margin-top: 16px;
-  justify-content: flex-end;
-}
-
 .cover {
   width: 44px;
   height: 60px;
@@ -354,7 +440,7 @@ onMounted(async () => {
 }
 
 .stock-warn {
-  color: #e6a23c;
+  color: var(--warn-text);
   font-weight: 600;
 }
 
@@ -366,7 +452,7 @@ onMounted(async () => {
 }
 
 .cover-uploader :deep(.el-upload:hover) {
-  border-color: #409eff;
+  border-color: var(--brand);
 }
 
 .cover-preview {
@@ -380,7 +466,7 @@ onMounted(async () => {
   width: 90px;
   height: 120px;
   font-size: 28px;
-  color: #8c939d;
+  color: var(--ink-3);
   display: flex;
   align-items: center;
   justify-content: center;

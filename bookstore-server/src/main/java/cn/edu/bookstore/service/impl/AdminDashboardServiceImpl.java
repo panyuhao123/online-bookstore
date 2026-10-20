@@ -8,10 +8,16 @@ import cn.edu.bookstore.mapper.CategoryMapper;
 import cn.edu.bookstore.mapper.OrdersMapper;
 import cn.edu.bookstore.mapper.UserMapper;
 import cn.edu.bookstore.model.vo.OverviewVO;
+import cn.edu.bookstore.model.vo.StatusCountVO;
 import cn.edu.bookstore.service.AdminDashboardService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 管理端首页统计实现。
@@ -55,7 +61,28 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         vo.setPendingShipCount(nvl(ordersMapper.selectCount(
                 new LambdaQueryWrapper<Orders>().eq(Orders::getStatus, OrderStatus.PAID.getCode()))));
         vo.setSalesAmount(ordersMapper.sumSalesAmount());
+        vo.setStatusCounts(buildStatusCounts());
         return vo;
+    }
+
+    /**
+     * 补齐状态分布：数据库只会返回「有订单的状态」，这里按枚举顺序补 0。
+     *
+     * <p>补 0 是有意的取舍 —— 前端拿到的永远是 5 行定长数据，
+     * 状态计数条与订单页胶囊就不必写「某状态不存在」的分支。
+     */
+    private List<StatusCountVO> buildStatusCounts() {
+        Map<Integer, Long> counted = new HashMap<>();
+        for (StatusCountVO row : ordersMapper.selectStatusCounts()) {
+            if (row != null && row.getStatus() != null) {
+                counted.put(row.getStatus(), row.getOrderCount() == null ? 0L : row.getOrderCount());
+            }
+        }
+        List<StatusCountVO> result = new ArrayList<>(OrderStatus.values().length);
+        for (OrderStatus status : OrderStatus.values()) {
+            result.add(StatusCountVO.of(status.getCode(), counted.get(status.getCode())));
+        }
+        return result;
     }
 
     /** MyBatis-Plus 的 selectCount 理论上不会返回 null，这里兜底为 0 避免前端拿到 null */

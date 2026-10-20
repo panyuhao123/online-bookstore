@@ -3,6 +3,7 @@ package cn.edu.bookstore.model.vo;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * 后台首页数据总览。
@@ -38,4 +39,12 @@ public class OverviewVO {
 
     /** 已收款金额：已支付及之后状态的订单金额合计 */
     private BigDecimal salesAmount;
+
+    /**
+     * 订单状态分布：固定按 1~5 顺序返回，无订单的状态也占一行（count=0）。
+     *
+     * <p>前端用这一份数据同时渲染工作台的状态计数条与订单页的状态胶囊筛选，
+     * 避免两处各调一次接口、也避免两处的口径分叉。
+     */
+    private List<StatusCountVO> statusCounts;
 }

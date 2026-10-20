@@ -2,6 +2,7 @@ package cn.edu.bookstore.mapper;
 
 import cn.edu.bookstore.entity.Orders;
 import cn.edu.bookstore.model.vo.SalesTrendVO;
+import cn.edu.bookstore.model.vo.StatusCountVO;
 import cn.edu.bookstore.model.vo.UserStatVO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Param;
@@ -73,4 +74,18 @@ public interface OrdersMapper extends BaseMapper<Orders> {
             + "GROUP BY DATE_FORMAT(create_time, '%Y-%m-%d') "
             + "ORDER BY date")
     List<SalesTrendVO> selectDailyTrend(@Param("start") LocalDateTime start);
+
+    /**
+     * 订单状态分布：一条 GROUP BY 拿到每个状态的单量。
+     *
+     * <p>与 {@link #sumSalesAmount()} 的口径差别要留意：这里数的是「单量」，
+     * 五种状态全算（含待支付与已取消），因为后台需要看到真实的全部分布；
+     * 而销售额只算钱已到账的 2/3/4。
+     *
+     * <p>没有订单的状态不会出现在结果里，由 Service 补 0，前端才能固定渲染 5 个胶囊。
+     *
+     * @return 按状态码升序排列的分布，可能少于 5 行
+     */
+    @Select("SELECT status, COUNT(*) AS orderCount FROM orders GROUP BY status ORDER BY status")
+    List<StatusCountVO> selectStatusCounts();
 }

@@ -6,10 +6,6 @@ export function pageBooks(params) {
   return request.get('/api/admin/book/page', { params })
 }
 
-export function getBook(id) {
-  return request.get('/api/admin/book/' + id)
-}
-
 /**
  * 图书汇总指标：总数 / 在售 / 下架 / 库存告急 / 在库册数。
  * 口径与工作台的「在售图书」一致（下架不计入库存告急），一处返回避免前端发四个计数请求。

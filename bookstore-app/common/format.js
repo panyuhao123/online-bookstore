@@ -34,9 +34,3 @@ export function dateText(v) {
   // 去掉秒与毫秒
   return s.length >= 16 ? s.slice(0, 16) : s
 }
-
-/** 手机号脱敏：138****8000 */
-export function maskPhone(p) {
-  const s = String(p || '')
-  return s.length === 11 ? s.slice(0, 3) + '****' + s.slice(7) : s
-}

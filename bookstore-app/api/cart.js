@@ -13,9 +13,6 @@ export const updateCart = (cartId, data) => put('/api/cart/' + cartId, data)
 /** 删除单条 */
 export const removeCart = (cartId) => del('/api/cart/' + cartId)
 
-/** 批量删除：body 为 cartId 数组 */
-export const removeCartBatch = (cartIds) => post('/api/cart/removeBatch', cartIds)
-
 /**
  * 合并未登录期间的本地购物车：入参 [{bookId, quantity}]
  * 返回 {mergedCount, totalQuantity, skipped:[{bookId, title, reason}]}

@@ -24,8 +24,3 @@ export function removeCart(cartId) {
 export function removeCartBatch(cartIds) {
   return request.post('/api/cart/removeBatch', cartIds)
 }
-
-/** 合并未登录期间的本地购物车：{items: [{bookId, quantity}]} */
-export function mergeCart(items) {
-  return request.post('/api/cart/merge', { items })
-}

@@ -17,8 +17,12 @@
     # 连同单元测试、管理端测试与前端静态检查一起跑（质量门禁口径）
     python tools/run_all_checks.py --with-unit --with-admin --with-frontend
 
-    # 再加上 PC 商城（bookstore-web）端到端：未起 Web dev server 时会自动拉起 5176
-    python tools/run_all_checks.py --with-unit --with-admin --with-frontend --with-web
+    # 再加上 PC 商城（bookstore-web）与管理端 UI 端到端：
+    # 未起 dev server 时会自动拉起 5176 / 5173，并在收尾停掉自己拉起的进程
+    python tools/run_all_checks.py --with-unit --with-admin --with-frontend --with-web --with-admin-ui
+
+    # 只跑某一端（--only 认 verify_web_pc 与 verify_web_pc.cjs 两种写法）
+    python tools/run_all_checks.py --reuse-server --only verify_web_pc.cjs --with-web
 
     # 复用已经在跑的实例（不再自己起/停服务）
     python tools/run_all_checks.py --reuse-server
@@ -204,7 +208,8 @@ CJS_CHECKS = [
 # PC 商城端到端：需要后端服务 + Web dev server(5176) + 本机 Chrome（用 --with-web 开启）
 WEB_CHECKS = [
     ("verify_web_pc.cjs",
-     "PC 商城端到端：官方书单 / 排序透传 / 检索翻页 / 对比栏同步 / 购物车批量 / 立即购买", 0),
+     "PC 商城端到端：官方书单 / 排序透传 / 检索翻页 / 对比栏 / 购物车 / 立即购买"
+     " / 轮播图楼层 / 商品目录 / 搜索联想 / 徽标 / 运费明细 / 时间线 / 小票 / 书单 / 浏览历史", 0),
 ]
 
 # 管理端 UI 端到端：需要后端服务 + 管理端 dev server(5173) + 本机 Chrome（用 --with-admin-ui 开启）
@@ -222,6 +227,19 @@ INFRA = [
 
 def log(msg: str = "") -> None:
     print(msg, flush=True)
+
+
+def wanted(script: str, only: set[str]) -> bool:
+    """`--only` 是否选中某个脚本。
+
+    <p>三种写法都认：`verify_web_pc`、`verify_web_pc.cjs`、带目录的路径。
+    早先只比 `Path(script).stem`，用户按脚本全名传（带扩展名）时一个都匹配不上，
+    结果是「跑了 0 项却退出码 0」——比报错更危险，因为它看起来是绿的。
+    """
+    if not only:
+        return True
+    name = Path(script).name
+    return name in only or Path(script).stem in only
 
 
 def rule(title: str) -> None:
@@ -571,7 +589,7 @@ def main() -> int:
             log("  !! 找不到 node，跳过")
         else:
             for script, desc, expect_fail in CJS_CHECKS:
-                if only and Path(script).stem not in only:
+                if not wanted(script, only):
                     continue
                 log()
                 log("  >>> %s —— %s" % (script, desc))
@@ -601,7 +619,7 @@ def main() -> int:
             if reuse_web or web_proc is not None:
                 if wait_dev_ready(WEB_URL, "Web dev server"):
                     for script, desc, expect_fail in WEB_CHECKS:
-                        if only and Path(script).stem not in only:
+                        if not wanted(script, only):
                             continue
                         log()
                         log("  >>> %s —— %s" % (script, desc))
@@ -632,7 +650,7 @@ def main() -> int:
             if reuse_admin or admin_ui_proc is not None:
                 if wait_dev_ready(ADMIN_URL, "管理端 dev server"):
                     for script, desc, expect_fail in ADMIN_UI_CHECKS:
-                        if only and Path(script).stem not in only:
+                        if not wanted(script, only):
                             continue
                         log()
                         log("  >>> %s —— %s" % (script, desc))

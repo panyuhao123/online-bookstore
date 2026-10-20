@@ -5,7 +5,7 @@
  *      全部指向 APP H5（5175 / `#/pages/...`），run_all_checks.py --with-frontend 也只跑
  *      check_app_sfc.cjs（APP 的 SFC 静态检查）。PC 商城此前**没有任何自动化检查**，本脚本补这个缺口。
  *
- * 覆盖（均为 B1 批次修复过的真实功能缺陷，逐条可回归）：
+ * 覆盖（1~7 为 B1 批次修复过的真实功能缺陷，8~13 为 W2 接入的新功能，逐条可回归）：
  *   1. 官方书单能真正打开并渲染图书（此前 `Number('official-1')` = NaN，查询必然失效）
  *   2. 列表页读取并透传 `?sort=`（此前只认 keyword/categoryId，`看一看?sort=sales` 被丢弃）
  *   3. 非法 sort 回落 default（白名单，防止把任意串转发给后端）
@@ -13,6 +13,15 @@
  *   5. 对比栏跨组件响应式同步（此前 BookCard 直接写 localStorage，对比栏永远不刷新）
  *   6. 购物车批量操作按钮可用（此前手写复选框列却绑 @selection-change，按钮永远禁用）
  *   7. 「立即购买」只结算该一本（此前结算页按 checked 取商品，会连带购物车里其他商品）
+ *   8. 首页轮播图（S4）与分类楼层（N4）取自后端配置而非前端硬编码
+ *   9. 商品目录页（S6）按分类页签平铺，切页签后 URL 与服务端请求同步 `categoryId`
+ *  10. 搜索联想（N1）输入即请求 `/api/book/page?keyword=` 并渲染下拉
+ *  11. 图书徽标（N5）每条都有数据支撑，文案白名单内（不做无依据的「新品」）
+ *  12. 结算运费明细（S5）：显式传 `cartIds` 调 `settle-preview`，三项金额自洽
+ *  13. 订单时间线（N3）4 节点、小票导出（N8）真的产出 xlsx、书单（S1）与浏览历史（S2）读写后端
+ *
+ * 断言一律锁「方法 + 路径 + 请求体（postData）」，不只看路径：页面写操作后常会再拉一次列表，
+ * 只按路径取「最后一次请求」拿到的是那次读请求。详见 callOf()。
  *
  * 用法：先启动后端（8080）与 PC 商城 dev server（5176），再执行
  *   node tools/verify_web_pc.cjs
@@ -114,7 +123,7 @@ function makeClient(wsUrl) {
       if (msg.method === 'Network.requestWillBeSent') {
         const req = (msg.params && msg.params.request) || {}
         if (String(req.url || '').includes('/api/')) {
-          requests.push({ method: req.method, url: String(req.url) })
+          requests.push({ method: req.method, url: String(req.url), postData: req.postData || '' })
         }
       }
       listeners.forEach((fn) => fn(msg))
@@ -156,6 +165,16 @@ function makeClient(wsUrl) {
         .filter((r) => r.url.includes(sub))
         .map((r) => r.url.replace(/^https?:\/\/[^/]+/, ''))
     },
+    /**
+     * 按「方法 + 路径」取最后一次请求。
+     *
+     * <p>只按路径取最后一次是不够的：页面在写操作成功后会**再拉一次列表**，
+     * 那时「最后一次 /api/booklist/list」是一条 GET，而不是刚才那条 POST。
+     */
+    callOf(method, sub) {
+      const hits = requests.filter((r) => r.method === method && r.url.includes(sub))
+      return hits.length ? hits[hits.length - 1] : null
+    },
     clearRequests() {
       requests.length = 0
     },
@@ -175,6 +194,9 @@ const CLICK_BY_TEXT = (sel, text) => `(() => {
 async function main() {
   const userDir = path.join(os.tmpdir(), 'bookstore-web-pc-profile')
   fs.rmSync(userDir, { recursive: true, force: true })
+  const dlDir = path.join(os.tmpdir(), 'bookstore-web-pc-downloads')
+  fs.rmSync(dlDir, { recursive: true, force: true })
+  fs.mkdirSync(dlDir, { recursive: true })
   const chrome = spawn(
     CHROME,
     [
@@ -201,6 +223,47 @@ async function main() {
   }
   const cartBefore = await api('GET', '/api/cart/list', undefined, token)
   const cartIdsBefore = ((cartBefore.data || {}).list || []).map((i) => i.id)
+
+  // ---- W2 新增功能所需的测试数据（全部走接口造，跑完在 finally 里还原） ---- #
+  const STAMP = Date.now()
+  const testBooklistName = 'E2E 商城书单 ' + STAMP
+  let testBooklistId = null
+  let createdAddressId = null
+  let testOrderId = null
+  const historyBook = buyTarget
+
+  // 书单（S1）：建一个 + 加一本，供「我的书单」与「书单详情」断言
+  const bl = await api(
+    'POST',
+    '/api/booklist',
+    { name: testBooklistName, description: '自动化测试创建，跑完自动删除', isPublic: 1 },
+    token
+  )
+  testBooklistId = (bl.data || {}).id || null
+  if (testBooklistId) {
+    await api('POST', `/api/booklist/${testBooklistId}/books`, { bookIds: [historyBook.id] }, token)
+  }
+
+  // 地址：下单必须有收货地址；用户没有才建一个（建了就记 id，收尾删掉）
+  const addr = await api('GET', '/api/address/list', undefined, token)
+  const addrList = addr.data || []
+  if (!addrList.length) {
+    const add = await api(
+      'POST',
+      '/api/address/add',
+      {
+        receiver: 'E2E 测试',
+        phone: '13800138000',
+        province: '北京市',
+        city: '北京市',
+        district: '东城区',
+        detail: '自动化测试地址（跑完自动删除）',
+        isDefault: 1
+      },
+      token
+    )
+    createdAddressId = (add.data || {}).id || null
+  }
 
   try {
     if (!fs.existsSync(CHROME)) throw new Error('未找到 Chrome：' + CHROME)
@@ -333,6 +396,151 @@ async function main() {
       removed === 'clicked' && barText2.includes('(1/4)'),
       `${removed} | 对比栏=${barText2}`
     )
+
+    // ---------- 8. 首页轮播图取自后端（S4） ----------
+    c1.clearRequests()
+    await c1.goto('#/', 5000)
+    const bannerReq = c1.requests.some((r) => r.url.includes('/api/banner/list'))
+    const bannerApi = await api('GET', '/api/banner/list')
+    const bannerList = bannerApi.data || []
+    const bannerState = JSON.parse(
+      String(
+        (await c1.eval(`(() => {
+        const slides = [...document.querySelectorAll('.banner-slide')];
+        return JSON.stringify({
+          count: slides.length,
+          text: slides.map((s) => (s.innerText || '').replace(/\\s+/g, ' ').trim()).join(' | ')
+        });
+      })()`)) || '{}'
+      )
+    )
+    check(
+      '首页轮播图请求后台配置并完成渲染（S4）',
+      bannerReq && bannerState.count > 0,
+      `请求=${bannerReq} 渲染张数=${bannerState.count} 接口条数=${bannerList.length}`
+    )
+    // 接口有数据时必须与配置一致；为空时前端有本地兜底（设计如此），只能断言「没开天窗」
+    const bannerMatched =
+      bannerList.length === 0
+        ? bannerState.count > 0
+        : String(bannerState.text || '').includes(String(bannerList[0].title || ''))
+    check(
+      bannerList.length === 0 ? '轮播图为空时前端有兜底（不开天窗）' : '轮播图内容与后台配置一致',
+      bannerMatched,
+      `接口首条=${(bannerList[0] || {}).title || '(无)'} 渲染=${String(bannerState.text || '').slice(0, 60)}`
+    )
+
+    // ---------- 9. 首页分类楼层（N4） ----------
+    const floorState = JSON.parse(
+      String(
+        (await c1.eval(`(() => {
+        const floors = [...document.querySelectorAll('.floor')];
+        const names = floors
+          .map((f) => { const h = f.querySelector('.floor-title h2'); return h ? (h.innerText || '').trim() : ''; })
+          .filter(Boolean);
+        return JSON.stringify({ count: floors.length, names: names.slice(0, 6) });
+      })()`)) || '{}'
+      )
+    )
+    check(
+      '首页按分类聚合楼层（N4，含分类名与图书卡片）',
+      floorState.count >= 2 && (floorState.names || []).length >= 1,
+      `楼层数=${floorState.count} 分类名=${JSON.stringify(floorState.names || [])}`
+    )
+
+    // ---------- 10. 商品目录页（S6） ----------
+    c1.clearRequests()
+    await c1.goto('#/catalog', 5000)
+    const catalogState = JSON.parse(
+      String(
+        (await c1.eval(`(() => {
+        return JSON.stringify({
+          tabs: document.querySelectorAll('.cat-tab').length,
+          cards: document.querySelectorAll('.book-grid .book-card').length,
+          title: (document.querySelector('.page-title') || {}).innerText || ''
+        });
+      })()`)) || '{}'
+      )
+    )
+    check(
+      '商品目录页按分类页签平铺图书（S6）',
+      catalogState.tabs >= 2 && catalogState.cards > 0,
+      `页签=${catalogState.tabs} 图书=${catalogState.cards} 标题=${String(catalogState.title || '').trim()}`
+    )
+
+    // ---------- 11. 目录页切分类：URL 与请求同步 ----------
+    c1.clearRequests()
+    const tabClick = String(
+      (await c1.eval(
+        `(() => { const tabs = [...document.querySelectorAll('.cat-tab')]; if (tabs.length < 2) return 'no-tabs'; tabs[1].click(); return 'clicked'; })()`
+      )) || ''
+    )
+    await sleep(3500)
+    const catHash = String((await c1.eval('location.hash')) || '')
+    const catQuery = c1.apiQueries('/api/book/page').pop() || ''
+    check(
+      '目录页切分类后 URL 与服务端请求同步 categoryId',
+      tabClick === 'clicked' && /categoryId=\d+/.test(catHash) && /categoryId=\d+/.test(catQuery),
+      `点击=${tabClick} url=${catHash} 请求=${catQuery}`
+    )
+
+    // ---------- 12. 搜索联想（N1） ----------
+    // 关键字取自真实书名，避免用到库里没有的词导致「联想为空」的技术性失败
+    const kwSeed = String((all[0] || {}).title || '').slice(0, 2)
+    c1.clearRequests()
+    await c1.goto('#/books', 3500)
+    c1.clearRequests()
+    const typed = String(
+      (await c1.eval(`(() => {
+        const input = document.querySelector('.search-box input');
+        if (!input) return 'no-input';
+        input.focus();
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+        setter.call(input, ${JSON.stringify(kwSeed)});
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        return 'ok';
+      })()`)) || ''
+    )
+    await sleep(3000)
+    const sugState = JSON.parse(
+      String(
+        (await c1.eval(`(() => {
+        const items = [...document.querySelectorAll('.search-suggest-popper .sug-item')];
+        return JSON.stringify({
+          count: items.length,
+          first: items.length ? (items[0].innerText || '').replace(/\\s+/g, ' ').trim() : ''
+        });
+      })()`)) || '{}'
+      )
+    )
+    const sugQuery = c1.apiQueries('/api/book/page').pop() || ''
+    check(
+      '搜索联想输入即请求 keyword 并渲染下拉（N1）',
+      typed === 'ok' && sugState.count > 0 && sugQuery.includes('keyword=' + encodeURIComponent(kwSeed)),
+      `输入=${kwSeed} 建议数=${sugState.count} 请求=${sugQuery}`
+    )
+
+    // ---------- 13. 图书徽标（N5） ----------
+    await c1.goto('#/books', 4000)
+    const badgeState = JSON.parse(
+      String(
+        (await c1.eval(`(() => {
+        const items = [...document.querySelectorAll('.badge-strip .badge-item')];
+        return JSON.stringify({
+          count: items.length,
+          texts: items.map((n) => (n.innerText || '').trim()).slice(0, 10)
+        });
+      })()`)) || '{}'
+      )
+    )
+    // 徽标文案白名单：每条都必须有数据支撑，不允许出现编造的「新品」之类
+    const BADGE_RE = /^(已售罄|仅剩 \d+ 件|热销|好评|包邮)$/
+    const badTexts = (badgeState.texts || []).filter((t) => !BADGE_RE.test(t))
+    check(
+      '图书卡片徽标有数据支撑且文案在白名单内（N5）',
+      badgeState.count > 0 && badTexts.length === 0,
+      `徽标数=${badgeState.count} 样本=${JSON.stringify(badgeState.texts || [])} 越界=${JSON.stringify(badTexts)}`
+    )
     c1.close()
 
     // ================= 登录态检查 =================
@@ -428,10 +636,180 @@ async function main() {
       cf.rows === 1,
       `行数=${cf.rows} 商品=${JSON.stringify(cf.titles || [])}（购物车另有 ${cartIdsBefore.length} 条）`
     )
+
+    // ---------- 14. 结算运费明细（S5） ----------
+    const settleReq = c2.callOf('POST', '/api/order/settle-preview')
+    const settlePost = settleReq ? String(settleReq.postData || '') : ''
+    const amtState = JSON.parse(
+      String(
+        (await c2.eval(`(() => {
+        const rows = [...document.querySelectorAll('.amount-section .amount-row')];
+        const txt = (el) => (el ? (el.innerText || '').replace(/\\s+/g, ' ').trim() : '');
+        const pick = (kw) => rows.map(txt).find((t) => t.includes(kw)) || '';
+        return JSON.stringify({
+          goods: pick('商品总额'),
+          freight: pick('运费'),
+          total: pick('应付金额'),
+          freeTip: txt(document.querySelector('.amount-section .free-tip'))
+        });
+      })()`)) || '{}'
+      )
+    )
+    const numOf = (s) => Number(String(s).replace(/[^\d.]/g, '')) || 0
+    check(
+      '结算页显式传 cartIds 调 settle-preview（金额以服务端为准）',
+      !!settleReq && settlePost.includes('cartIds'),
+      settlePost ? settlePost.slice(0, 140) : '未捕获到 POST /api/order/settle-preview'
+    )
+    const sumOk =
+      numOf(amtState.total) > 0 &&
+      Math.abs(numOf(amtState.goods) + numOf(amtState.freight) - numOf(amtState.total)) < 0.01
+    check(
+      '结算页三项金额自洽（商品总额 + 运费 = 应付）',
+      sumOk,
+      `${amtState.goods} | ${amtState.freight} | ${amtState.total} | 提示=${amtState.freeTip || '(无)'}`
+    )
+
+    // ---------- 15. 提交订单并校验时间线（N3） ----------
+    c2.clearRequests()
+    const submitClick = String((await c2.eval(CLICK_BY_TEXT('.submit-row .el-button', '提交订单'))) || '')
+    await sleep(6500)
+    const orderState = JSON.parse(
+      String(
+        (await c2.eval(`(() => {
+        const steps = [...document.querySelectorAll('.el-step')];
+        return JSON.stringify({
+          count: steps.length,
+          titles: steps.map((s) => {
+            const t = s.querySelector('.el-step__title');
+            return t ? (t.innerText || '').trim() : '';
+          }),
+          hash: location.hash
+        });
+      })()`)) || '{}'
+      )
+    )
+    const om = /\/orders\/(\d+)/.exec(String(orderState.hash || ''))
+    testOrderId = om ? Number(om[1]) : null
+    check(
+      '提交订单后进入订单详情页',
+      submitClick === 'clicked' && !!testOrderId,
+      `按钮=${submitClick} url=${orderState.hash || ''}`
+    )
+    const wantSteps = ['提交订单', '支付成功', '商家发货', '确认收货']
+    check(
+      '订单时间线渲染 4 个节点且顺序正确（N3）',
+      orderState.count === 4 && (orderState.titles || []).join(',') === wantSteps.join(','),
+      `节点数=${orderState.count} 标题=${JSON.stringify(orderState.titles || [])}`
+    )
+
+    // ---------- 16. 小票导出真的产出文件（N8） ----------
+    // 用 CDP 把下载目录指到临时目录：只断言「按钮点了」证明不了导出能用，
+    // 必须看到真的落了 .xlsx 文件（XLSX.writeFile 走 Blob + a[download]，无后端参与）。
+    await c2.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: dlDir })
+    const exportClick = String((await c2.eval(CLICK_BY_TEXT('.el-button', '导出小票'))) || '')
+    await sleep(4000)
+    const downloaded = fs.readdirSync(dlDir).filter((f) => f.toLowerCase().endsWith('.xlsx'))
+    check(
+      '订单小票导出产出 xlsx 文件（N8）',
+      exportClick === 'clicked' && downloaded.length > 0,
+      `按钮=${exportClick} 下载=${JSON.stringify(downloaded)}`
+    )
+
+    // ---------- 17. 我的书单（S1） ----------
+    await c2.goto('#/booklists', 5000)
+    const mineTab = String(
+      (await c2.eval(CLICK_BY_TEXT('.booklist-tabs .el-tabs__item', '我的书单'))) || ''
+    )
+    await sleep(3000)
+    const mineState = JSON.parse(
+      String(
+        (await c2.eval(`(() => {
+        const cards = [...document.querySelectorAll('.booklist-card.mine')];
+        return JSON.stringify({
+          count: cards.length,
+          names: cards
+            .map((c) => { const n = c.querySelector('.list-name'); return n ? (n.innerText || '').trim() : ''; })
+            .slice(0, 6)
+        });
+      })()`)) || '{}'
+      )
+    )
+    check(
+      '「我的书单」展示后端数据（S1，含接口新建的书单）',
+      mineTab === 'clicked' && (mineState.names || []).includes(testBooklistName),
+      `切页签=${mineTab} 书单数=${mineState.count} 名称=${JSON.stringify(mineState.names || [])}`
+    )
+
+    // ---------- 18. 书单详情 ----------
+    await c2.goto('#/booklists/' + testBooklistId, 5000)
+    const blDetail = JSON.parse(
+      String(
+        (await c2.eval(`(() => {
+        const h2 = document.querySelector('.detail-header .header-info h2');
+        const tag = document.querySelector('.detail-header .official-tag');
+        return JSON.stringify({
+          name: h2 ? (h2.innerText || '').replace(/\\s+/g, ' ').trim() : '',
+          tag: tag ? (tag.innerText || '').trim() : '',
+          cards: document.querySelectorAll('.book-grid .book-card').length,
+          notFound: !!document.querySelector('.el-result')
+        });
+      })()`)) || '{}'
+      )
+    )
+    check(
+      '书单详情按 id 从后端加载并渲染图书（S1）',
+      String(blDetail.name || '').includes(testBooklistName) &&
+        blDetail.tag === '我的' &&
+        blDetail.cards > 0,
+      `名称=${blDetail.name} 标记=${blDetail.tag || '(无)'} 图书=${blDetail.cards} 空态=${blDetail.notFound}`
+    )
+
+    // ---------- 19. 浏览历史（S2） ----------
+    await c2.goto('#/account/history', 5500)
+    const histState = JSON.parse(
+      String(
+        (await c2.eval(`(() => {
+        const rows = [...document.querySelectorAll('.el-table__body-wrapper tbody tr')];
+        return JSON.stringify({
+          count: rows.length,
+          titles: rows
+            .map((r) => { const t = r.querySelector('.book-title'); return t ? (t.innerText || '').trim() : ''; })
+            .slice(0, 8)
+        });
+      })()`)) || '{}'
+      )
+    )
+    check(
+      '浏览详情后写入后端并在「我的足迹」展示（S2）',
+      histState.count > 0 && (histState.titles || []).includes(String(historyBook.title || '')),
+      `行数=${histState.count} 目标书「${historyBook.title}」 列表=${JSON.stringify(histState.titles || [])}`
+    )
     c2.close()
   } catch (e) {
     check('脚本执行', false, e.message)
   } finally {
+    // 还原本次验证产生的数据：测试订单 / 测试书单 / 浏览记录 / 测试地址 / 购物车条目
+    try {
+      if (testOrderId) {
+        const c = await api('POST', `/api/order/${testOrderId}/cancel`, undefined, token)
+        console.log(`[清理] 测试订单 #${testOrderId} 已取消（code=${c.code}）`)
+      }
+      if (testBooklistId) {
+        const d = await api('DELETE', `/api/booklist/${testBooklistId}`, undefined, token)
+        console.log(`[清理] 测试书单 #${testBooklistId} 已删除（code=${d.code}）`)
+      }
+      if (historyBook && historyBook.id) {
+        const h = await api('DELETE', `/api/history/${historyBook.id}`, undefined, token)
+        console.log(`[清理] 浏览记录（书 #${historyBook.id}）已删除（code=${h.code}）`)
+      }
+      if (createdAddressId) {
+        const a = await api('DELETE', `/api/address/${createdAddressId}`, undefined, token)
+        console.log(`[清理] 测试地址 #${createdAddressId} 已删除（code=${a.code}）`)
+      }
+    } catch (e) {
+      console.log('[清理] 业务数据还原失败：' + e.message)
+    }
     // 还原购物车：清掉本次验证新增的条目（含「立即购买」多加的那一本）
     try {
       const now = await api('GET', '/api/cart/list', undefined, token)
@@ -452,6 +830,7 @@ async function main() {
     chrome.kill()
     try {
       fs.rmSync(userDir, { recursive: true, force: true })
+      fs.rmSync(dlDir, { recursive: true, force: true })
     } catch (e) {}
   }
 

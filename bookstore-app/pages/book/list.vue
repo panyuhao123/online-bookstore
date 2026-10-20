@@ -76,7 +76,7 @@ import TabBar from '@/components/tab-bar.vue'
 import FloorTitle from '@/components/floor-title.vue'
 import BookCard from '@/components/book-card.vue'
 import StateView from '@/components/state-view.vue'
-import { navHeight, takeSearchKeyword, isWide } from '@/common/web'
+import { navHeight, isWide } from '@/common/web'
 import WebFooter from '@/components/web-footer.vue'
 import BreadCrumb from '@/components/bread-crumb.vue'
 
@@ -190,8 +190,6 @@ function goDetail(book) {
 onLoad((options) => {
   const q = options || {}
   keyword.value = q.keyword ? decodeURIComponent(q.keyword) : ''
-  // 桌面顶栏搜索把关键词放在本地存储里（URL query 会被 uni 路由二次编码，见 common/web.js）
-  if (!keyword.value) keyword.value = takeSearchKeyword()
   categoryId.value = q.categoryId || ''
   title.value = q.title ? decodeURIComponent(q.title) : ''
   autofocus.value = q.focus === '1'

@@ -14,19 +14,11 @@
 import { isLogin } from '@/common/auth'
 
 /**
- * 需要登录才能进入的页面（与 pages.json 的 path 一致，不带前导斜杠）。
- *
- * 未列出的页面允许匿名访问：首页/分类/书单/详情是浏览页；
- * 购物车未登录时展示「本机购物车」，是本项目的既有设计。
+ * 是否需要登录由页面自身声明：受保护页在 onLoad 首行调用 requireLogin()。
+ * 不在此维护路径清单 —— 清单与 pages.json 双写必然漂移，且新增页面容易漏登记。
+ * 未声明守卫的页面一律允许匿名访问（首页/分类/书单/详情等浏览页；
+ * 购物车未登录时展示「本机购物车」是本项目的既有设计）。
  */
-const GUARDED = [
-  'pages/order/list',
-  'pages/order/detail',
-  'pages/order/confirm',
-  'pages/address/list',
-  'pages/address/edit',
-  'pages/review/edit'
-]
 
 /** 当前页面路径（含查询参数，不带前导斜杠）；APP 端无 URL 概念，返回空串 */
 export function currentPath() {
@@ -93,10 +85,4 @@ export function requireLogin() {
   saveRedirect()
   uni.reLaunch({ url: '/pages/login/login' })
   return false
-}
-
-/** 该页面是否需要登录（供调试与后续扩展使用） */
-export function isGuarded(path) {
-  const p = String(path || '').split('?')[0]
-  return GUARDED.includes(p)
 }

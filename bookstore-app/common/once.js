@@ -16,11 +16,6 @@
  */
 const running = new Set()
 
-/** 某个动作是否正在进行（可用于按钮置灰，避免用户以为没点上） */
-export function isRunning(key) {
-  return running.has(key)
-}
-
 /**
  * 串行执行：key 相同的调用，未结束时再触发直接返回 undefined。
  *

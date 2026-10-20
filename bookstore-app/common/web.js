@@ -72,13 +72,6 @@ try {
  */
 export const navHeight = computed(() => (wide.value ? WEB_HEADER_H : statusBarH.value + NAV_ROW_H))
 
-/**
- * 主内容区左右留白（px）。
- * 用于 fixed 元素（排序条、结算底栏）把内容推到与 .page 同样的居中区域内，
- * 不依赖 transform，避免受页面切换动画的 transform 影响 fixed 定位基准。
- */
-export const sideGutter = computed(() => (wide.value ? 'max(24px, calc((100% - 1200px) / 2 + 24px))' : '24rpx'))
-
 /* ---------------- 搜索关键词传递 ---------------- */
 
 /**
@@ -98,14 +91,6 @@ export function goSearch(keyword) {
   } else {
     uni.navigateTo({ url })
   }
-}
-
-/**
- * 列表页 onLoad 读取一次性搜索词（读完即清）。
- * 当前直接返回空，关键词以 URL query 为准，便于分享与刷新。
- */
-export function takeSearchKeyword() {
-  return ''
 }
 
 /** 当前页面 route，用于在顶栏高亮对应的一级导航 */

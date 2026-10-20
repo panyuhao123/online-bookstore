@@ -26,11 +26,6 @@ function saveLocalCart(list) {
   uni.setStorageSync(CART_KEY, list)
 }
 
-/** 本地购物车商品种数（用于角标提示） */
-export function localCartSize() {
-  return getLocalCart().length
-}
-
 /** 本地购物车总件数 */
 export function localCartCount() {
   return getLocalCart().reduce((sum, item) => sum + (item.quantity || 0), 0)
@@ -88,12 +83,6 @@ export function toggleLocalChecked(bookId) {
     item.checked = item.checked === 1 ? 0 : 1
     saveLocalCart(list)
   }
-}
-
-/** 批量设置勾选（全选 / 取消全选） */
-export function setLocalCheckedAll(checked) {
-  const list = getLocalCart().map((item) => ({ ...item, checked }))
-  saveLocalCart(list)
 }
 
 /** 删除单条 */

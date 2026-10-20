@@ -1,3 +1,106 @@
+/* ============================================================================
+ * 管理端设计令牌（v1.0）
+ * 主色取自参考后台的紫，语义色按「状态」而非「好看」分配。
+ * 所有 Element Plus 派生档必须显式给全：只设 --el-color-primary 时，
+ * 标签/开关/滑块仍会用默认蓝去算 light-3/5/7/8/9，界面上会残留蓝色。
+ * ========================================================================== */
+:root {
+  /* 品牌主色 —— 紫 */
+  --brand: #6c4df2;
+  --brand-hover: #7e63f5;
+  --brand-active: #563ec2;
+  --brand-weak: #f1edff;
+  --brand-line: #ded5ff;
+
+  /* 语义状态色：成功 / 进行中 / 待处理 / 失败 / 中性 */
+  --ok: #1f9d63;
+  --ok-text: #177a4c;
+  --ok-weak: #eaf8f0;
+  --info: #3e7bdb;
+  --info-text: #2f62b0;
+  --info-weak: #eef5ff;
+  --warn: #e09520;
+  --warn-text: #b4740e;
+  --warn-weak: #fff7e6;
+  --danger: #e5453c;
+  --danger-text: #c1362e;
+  --danger-weak: #fdeceb;
+  --gray: #8c93a1;
+  --gray-text: #6b7280;
+  --gray-weak: #f3f4f6;
+
+  /* 文字与描边 */
+  --ink-1: #1f2328;
+  --ink-2: #5b6270;
+  --ink-3: #8c93a1;
+  --ink-4: #a8afbb;
+  --line: #eceef2;
+  --line-strong: #dfe2e8;
+  --bg: #f6f7f9;
+
+  /* 形状与阴影 */
+  --r-card: 14px;
+  --r-btn: 8px;
+  --r-chip: 999px;
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 8px 24px -16px rgba(16, 24, 40, 0.16);
+  --shadow-pop: 0 8px 28px -12px rgba(16, 24, 40, 0.24);
+
+  /* ---- Element Plus 主色派生档（按官方 mix 公式算好写死） ---- */
+  --el-color-primary: var(--brand);
+  --el-color-primary-light-3: #9882f6;
+  --el-color-primary-light-5: #b6a6f9;
+  --el-color-primary-light-7: #d3cafb;
+  --el-color-primary-light-8: #e2dbfc;
+  --el-color-primary-light-9: #f0edfe;
+  --el-color-primary-dark-2: #563ec2;
+
+  --el-color-success: var(--ok);
+  --el-color-success-light-3: #62ba8d;
+  --el-color-success-light-5: #8fceb1;
+  --el-color-success-light-7: #bce2d0;
+  --el-color-success-light-8: #d2ebdf;
+  --el-color-success-light-9: #e9f5ef;
+  --el-color-success-dark-2: #197e4f;
+
+  --el-color-warning: var(--warn);
+  --el-color-warning-light-3: #e7af4d;
+  --el-color-warning-light-5: #edc57f;
+  --el-color-warning-light-7: #f3dbb2;
+  --el-color-warning-light-8: #f6e6c8;
+  --el-color-warning-light-9: #fcf3e4;
+  --el-color-warning-dark-2: #b3771a;
+
+  --el-color-danger: var(--danger);
+  --el-color-danger-light-3: #ec736c;
+  --el-color-danger-light-5: #f2a29d;
+  --el-color-danger-light-7: #f7cfcd;
+  --el-color-danger-light-8: #f9e0de;
+  --el-color-danger-light-9: #fcedec;
+  --el-color-danger-dark-2: #b73730;
+
+  --el-color-info: var(--gray);
+  --el-color-info-light-3: #afb4be;
+  --el-color-info-light-5: #c6cad1;
+  --el-color-info-light-7: #dcdfe4;
+  --el-color-info-light-8: #e8eaee;
+  --el-color-info-light-9: #f3f4f6;
+  --el-color-info-dark-2: #707684;
+
+  /* 圆角 / 描边 / 文字：让 EP 组件跟上整体调性 */
+  --el-border-radius-base: var(--r-btn);
+  --el-border-radius-small: 6px;
+  --el-border-color: var(--line-strong);
+  --el-border-color-light: var(--line);
+  --el-border-color-lighter: var(--line);
+  --el-text-color-primary: var(--ink-1);
+  --el-text-color-regular: var(--ink-2);
+  --el-text-color-secondary: var(--ink-3);
+  --el-text-color-placeholder: var(--ink-4);
+  --el-fill-color-light: var(--bg);
+  --el-fill-color-blank: #fff;
+  --el-font-size-base: 13px;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -12,16 +115,20 @@ body,
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
-  background: #f5f7fa;
-  color: #303133;
+  background: var(--bg);
+  color: var(--ink-1);
+  -webkit-font-smoothing: antialiased;
 }
+
+/* ============================== 通用容器 ============================== */
 
 /* 通用卡片容器，页面内各区块统一留白与圆角 */
 .app-card {
   background: #fff;
-  border-radius: 8px;
-  padding: 16px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  border-radius: var(--r-card);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--line);
 }
 
 /* 页面顶部标题行 */
@@ -36,10 +143,11 @@ body {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
+  letter-spacing: -0.2px;
 }
 
 .app-muted {
-  color: #909399;
+  color: var(--ink-3);
   font-size: 12px;
 }
 
@@ -50,4 +158,384 @@ body {
   gap: 8px;
   align-items: center;
   margin-bottom: 12px;
+}
+
+/* 区块小标题：一个色块 + 文案 + 右侧补充说明 */
+.app-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.app-section__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-1);
+}
+
+.app-section__title::before {
+  content: '';
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--brand);
+}
+
+.app-section__extra {
+  font-size: 12px;
+  color: var(--ink-3);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ============================== 语义标签 ============================== */
+
+/* 状态胶囊：比 el-tag 更轻，适合表格与清单里大量出现 */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: var(--r-chip);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.pill::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.85;
+}
+
+.pill--ok {
+  color: var(--ok-text);
+  background: var(--ok-weak);
+}
+
+.pill--info {
+  color: var(--info-text);
+  background: var(--info-weak);
+}
+
+.pill--warn {
+  color: var(--warn-text);
+  background: var(--warn-weak);
+}
+
+.pill--danger {
+  color: var(--danger-text);
+  background: var(--danger-weak);
+}
+
+.pill--brand {
+  color: var(--brand-active);
+  background: var(--brand-weak);
+}
+
+.pill--gray {
+  color: var(--gray-text);
+  background: var(--gray-weak);
+}
+
+/* 文字型标记（用于「数据依赖」标注，无底色） */
+.tag-ok {
+  color: var(--ok-text);
+}
+.tag-warn {
+  color: var(--warn-text);
+}
+.tag-opt {
+  color: var(--ink-3);
+}
+
+/* ============================== 数字排版 ============================== */
+
+/* 金额、订单量等需要纵向对齐的数字统一等宽 */
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+.num--strong {
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+
+/* ============================== 列表页通用块 ============================== */
+
+/**
+ * 「汇总条 + 筛选卡 + 胶囊」是本项目所有列表页的统一骨架。
+ * 抽到全局而不是各页复制：这些页面的差异只在「显示哪几个数」，
+ * 骨架一旦分叉，改一次圆角就要改五个文件。
+ */
+
+/* 指标条：一行等分的数值格子，格间用细线分隔而不是卡片套卡片 */
+.statbar {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 0;
+  padding: 4px 0;
+}
+
+.statbar__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 0 18px;
+  border-right: 1px solid var(--line);
+}
+
+.statbar__cell:last-child {
+  border-right: none;
+}
+
+.statbar__label {
+  font-size: 12px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.statbar__value {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.4px;
+  color: var(--ink-1);
+}
+
+/* 需要在数字层面提醒的指标（库存告急、待发货）才用红，不要全篇都红 */
+.statbar__value.is-alert {
+  color: var(--danger-text);
+}
+
+.statbar__foot {
+  font-size: 11px;
+  color: var(--ink-4);
+  white-space: nowrap;
+}
+
+/* 筛选卡：上下两组条件之间用虚线分隔，避免「一坨输入框」 */
+.filter {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.filter__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter__row--status {
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+
+.filter__label {
+  margin-right: 4px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+/* 带底色的快捷区间按钮组 */
+.quick {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--gray-weak);
+}
+
+.quick__btn {
+  height: 26px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.quick__btn:hover {
+  color: var(--ink-1);
+}
+
+.quick__btn.on {
+  background: #fff;
+  color: var(--brand-active);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.1);
+}
+
+/* 区间/结果回显：贴在筛选行最右侧，用品牌浅底表示「这是一条生效中的条件」 */
+.filter__echo {
+  margin-left: auto;
+  padding: 4px 10px;
+  border-radius: var(--r-chip);
+  background: var(--brand-weak);
+  color: var(--brand-active);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* 状态胶囊：既是筛选器也是分布图例，选中态用品牌紫 */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-chip);
+  background: #fff;
+  color: var(--ink-2);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.chip i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dc);
+}
+
+.chip b {
+  font-weight: 700;
+  color: var(--ink-1);
+}
+
+.chip:hover {
+  border-color: var(--dc);
+}
+
+.chip.on {
+  border-color: var(--brand);
+  background: var(--brand-weak);
+  color: var(--brand-active);
+  font-weight: 600;
+}
+
+.chip.on b {
+  color: var(--brand-active);
+}
+
+/* 单元格主副两行：主行放标识，副行放补充信息，避免表格横向铺得太宽 */
+.cell-main {
+  font-size: 13px;
+  color: var(--ink-1);
+  line-height: 1.4;
+}
+
+.cell-sub {
+  font-size: 11.5px;
+  color: var(--ink-4);
+  line-height: 1.5;
+}
+
+.cell-sub-strong {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.cell-amount {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-1);
+}
+
+/* 列表表格：只留行分隔，去掉竖线与外框 */
+.list-table td.el-table__cell {
+  padding: 9px 0;
+}
+
+.list-table.el-table {
+  --el-table-border-color: transparent;
+}
+
+.list-table.el-table::before,
+.list-table .el-table__inner-wrapper::before {
+  display: none;
+}
+
+.pager {
+  margin-top: 14px;
+  justify-content: flex-end;
+}
+
+/* ============================== Element Plus 收口 ============================== */
+
+/* 表格：去掉外圈重描边与单元格竖线，靠行分隔与留白区分 */
+.el-table {
+  --el-table-border-color: var(--line);
+  --el-table-header-bg-color: #fafbfc;
+  --el-table-header-text-color: var(--ink-2);
+  --el-table-row-hover-bg-color: #faf9ff;
+  font-size: 13px;
+}
+
+.el-table th.el-table__cell {
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.2px;
+}
+
+/* 按钮：主按钮去掉默认阴影感，字重略提 */
+.el-button {
+  font-weight: 500;
+}
+
+.el-button--primary {
+  --el-button-bg-color: var(--brand);
+  --el-button-border-color: var(--brand);
+  --el-button-hover-bg-color: var(--brand-hover);
+  --el-button-hover-border-color: var(--brand-hover);
+  --el-button-active-bg-color: var(--brand-active);
+  --el-button-active-border-color: var(--brand-active);
+}
+
+/* 输入框聚焦时的描边用品牌紫，但不宜过重 */
+.el-input__wrapper.is-focus,
+.el-select .el-input.is-focus .el-input__wrapper {
+  box-shadow: 0 0 0 1px var(--brand) inset;
+}
+
+.el-pagination {
+  --el-pagination-button-bg-color: transparent;
+  margin-top: 14px;
+  justify-content: flex-end;
+}
+
+/* 抽屉标题栏轻量化 */
+.el-drawer__header {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-1);
+  font-weight: 600;
 }

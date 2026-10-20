@@ -2,7 +2,7 @@
   <div class="login-page">
     <div class="login-box">
       <div class="login-title">
-        <el-icon><Reading /></el-icon>
+        <span class="login-mark"><el-icon><Reading /></el-icon></span>
         <span>线上书店管理后台</span>
       </div>
 
@@ -107,26 +107,42 @@ function handleLogin() {
   align-items: center;
   justify-content: center;
   height: 100%;
-  background: linear-gradient(135deg, #4b6cb7, #182848);
+  /* 与侧栏同源的紫，避免登录页是蓝、进去是紫的两套语言 */
+  background:
+    radial-gradient(1100px 520px at 18% -8%, rgba(255, 255, 255, 0.16), transparent 62%),
+    linear-gradient(135deg, #7e63f5 0%, #5236c4 52%, #33207e 100%);
 }
 
 .login-box {
   width: 380px;
   padding: 32px 28px;
   background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px -24px rgba(24, 16, 60, 0.55);
 }
 
 .login-title {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
   margin-bottom: 24px;
-  font-size: 20px;
-  font-weight: 600;
-  color: #303133;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--ink-1);
+}
+
+.login-mark {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  color: #fff;
+  font-size: 18px;
+  background: linear-gradient(135deg, var(--brand), var(--brand-active));
+  box-shadow: 0 6px 14px -6px rgba(108, 77, 242, 0.7);
 }
 
 .login-btn {

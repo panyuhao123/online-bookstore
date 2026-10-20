@@ -986,7 +986,7 @@ onLoad((options) => {
     padding: 28px 28px 32px;
     background-color: $bg-card;
     border-radius: 10px;
-    box-shadow: $shadow-card;
+    border: 1rpx solid $border-color;
   }
 
   /* ---- 左：图集 ---- */
@@ -1316,7 +1316,7 @@ onLoad((options) => {
     background-repeat: no-repeat;
     background-position: center;
     background-size: contain;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23C8362F' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='21' r='1'/%3E%3Ccircle cx='20' cy='21' r='1'/%3E%3Cpath d='M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FF2832' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='21' r='1'/%3E%3Ccircle cx='20' cy='21' r='1'/%3E%3Cpath d='M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6'/%3E%3C/svg%3E");
   }
 
   .pd-buy {
@@ -1365,7 +1365,7 @@ onLoad((options) => {
     padding: 0 24px 20px;
     background-color: $bg-card;
     border-radius: 10px;
-    box-shadow: $shadow-card;
+    border: 1rpx solid $border-color;
   }
 
   .ps-tabbar {

@@ -34,7 +34,7 @@
           </template>
         </view>
         <view v-if="tags.length" class="tags">
-          <text v-for="t in tags" :key="t" class="promo">{{ t }}</text>
+          <text v-for="t in tags" :key="t" class="promo" :class="{ weak: t === '热销' }">{{ t }}</text>
         </view>
       </view>
 
@@ -170,7 +170,6 @@ function onBuy() {
   background-color: $bg-card;
   border: 1rpx solid $border-color;
   border-radius: $radius-lg;
-  box-shadow: $shadow-card;
   overflow: hidden;
 }
 
@@ -214,7 +213,7 @@ function onBuy() {
 
 .cover-tag.discount {
   font-weight: 700;
-  background: linear-gradient(135deg, #e4574e 0%, #a62a24 100%);
+  background: linear-gradient(135deg, $brand-light 0%, $brand-dark 100%);
 }
 
 .cover-tag.rank {
@@ -256,7 +255,7 @@ function onBuy() {
   font-weight: 600;
   color: $color-white;
   background-color: rgba(31, 33, 38, 0.6);
-  border-radius: $radius-pill;
+  border-radius: $radius-sm;
 }
 
 .info {
@@ -357,6 +356,12 @@ function onBuy() {
   border-radius: $radius-sm;
 }
 
+/* 「热销」这类正向标签用浅红底红字；「仅剩 N 件」是催促信号，才给实红白字 */
+.promo.weak {
+  color: $brand;
+  background-color: $brand-weak;
+}
+
 .bottom {
   margin-top: auto;
   min-height: 56rpx;
@@ -374,14 +379,15 @@ function onBuy() {
 }
 
 .rmb {
-  font-size: $fs-xs;
-  font-weight: 600;
+  font-size: $fs-sm;
+  font-weight: 700;
   color: $price-color;
 }
 
 .num {
-  font-size: $fs-xl;
+  font-size: 38rpx;
   font-weight: 700;
+  line-height: 1.1;
   color: $price-color;
 }
 
@@ -418,7 +424,7 @@ function onBuy() {
   justify-content: center;
   font-size: $fs-sm;
   font-weight: 600;
-  border-radius: $radius-pill;
+  border-radius: $radius-btn;
   transition: opacity 0.15s;
 }
 

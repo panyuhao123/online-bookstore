@@ -158,7 +158,7 @@ onShow(() => {
   padding: $sp-4 $gap-card;
   border-radius: $radius-lg;
   background-color: $bg-card;
-  box-shadow: $shadow-card;
+  border: 1rpx solid $border-color;
 }
 
 .card-title {
@@ -216,7 +216,7 @@ onShow(() => {
   justify-content: center;
   font-size: $fs-md;
   font-weight: 600;
-  border-radius: $radius-pill;
+  border-radius: $radius-btn;
 }
 
 .test {

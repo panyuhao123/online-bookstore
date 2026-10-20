@@ -9,7 +9,7 @@
         :show-scrollbar="false"
         refresher-enabled
         :refresher-triggered="refreshing"
-        refresher-background="#F4F5F7"
+        refresher-background="#f5f5f5"
         @refresherrefresh="onRefresh"
         @scrolltolower="loadMore"
       >
@@ -319,7 +319,8 @@ onLoad(() => {
   padding: $sp-3 $sp-2;
   display: flex;
   flex-direction: row;
-  background: linear-gradient(120deg, #f7e8e4 0%, #fbe9e5 100%);
+  /* 红→橙的暖色浅渐变：呼应楼层竖条与 PC 楼层标题条，别再回到朱砂粉 */
+  background: linear-gradient(120deg, $brand-weak 0%, $orange-weak 100%);
   border-radius: $radius-lg;
 }
 
@@ -396,7 +397,7 @@ onLoad(() => {
   font-size: $fs-sm;
   color: $text-regular;
   background-color: $bg-fill;
-  border-radius: $radius-pill;
+  border-radius: $radius-btn;
 }
 
 .chip-item.on {

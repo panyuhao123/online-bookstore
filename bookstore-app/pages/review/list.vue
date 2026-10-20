@@ -259,7 +259,7 @@ onReachBottom(() => {
   padding: $gap-card;
   border-radius: $radius-lg;
   background-color: $bg-card;
-  box-shadow: $shadow-card;
+  border: 1rpx solid $border-color;
 }
 
 /* ---- 评分汇总 ---- */

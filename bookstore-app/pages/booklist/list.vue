@@ -11,7 +11,7 @@
         :show-scrollbar="false"
         refresher-enabled
         :refresher-triggered="refreshing"
-        refresher-background="#F4F5F7"
+        refresher-background="#f5f5f5"
         @refresherrefresh="onRefresh"
         @scrolltolower="loadMore"
       >
@@ -228,7 +228,7 @@ onLoad(async () => {
   padding: $gap-card;
   background-color: $bg-card;
   border-radius: $radius-lg;
-  box-shadow: $shadow-card;
+  border: 1rpx solid $border-color;
 }
 
 .bl-top {

@@ -946,7 +946,7 @@ onShow(() => {
   .cart-table {
     background-color: $bg-card;
     border-radius: 10px;
-    box-shadow: $shadow-card;
+    border: 1rpx solid $border-color;
     overflow: hidden;
   }
 

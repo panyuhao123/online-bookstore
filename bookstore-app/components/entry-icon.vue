@@ -259,11 +259,13 @@ defineProps({
 }
 
 /* ---- 配色档位：与 entry-grid 的色块同源（低饱和块 + 同系深字） ---- */
-.ic-red { color: #c8362f; }
-.ic-orange { color: #b25e1f; }
+.ic-red { color: $brand; }
+.ic-orange { color: $orange-dark; }
 .ic-blue { color: #185fa5; }
 .ic-green { color: #3b6d11; }
 .ic-purple { color: #534ab7; }
 .ic-amber { color: #854f0b; }
 .ic-teal { color: #0f6e56; }
+/* 中性档：顶栏这类「顺带提供」的入口用它，把橙色让给搜索与购物车 */
+.ic-grey { color: $text-regular; }
 </style>

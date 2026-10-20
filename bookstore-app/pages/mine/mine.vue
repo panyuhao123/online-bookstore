@@ -447,7 +447,7 @@ onShow(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 16rpx;
+  border-radius: $radius-md;
   background-color: #eeedfe;
 }
 
@@ -490,7 +490,7 @@ onShow(() => {
   color: $brand;
   background-color: $bg-card;
   border-radius: $radius-lg;
-  box-shadow: $shadow-card;
+  border: 1rpx solid $border-color;
 }
 
 .logout-btn.disabled {

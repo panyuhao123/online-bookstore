@@ -75,7 +75,8 @@ import WebFooter from '@/components/web-footer.vue'
 import { isWide } from '@/common/web'
 
 /** 开关选中色，与 $brand 保持一致 */
-const SWITCH_COLOR = '#C8362F'
+/* switch 的 color 属性只接受色值字符串，取不到 SCSS Token：改主色时这里要同步 */
+const SWITCH_COLOR = '#ff2832'
 
 /** 星级文案：给纯图形一个可读锚点，比只让用户看星星更好判断 */
 const RATING_TEXTS = ['', '很差', '较差', '一般', '满意', '非常满意']
@@ -151,7 +152,7 @@ onLoad((options) => {
   padding: $gap-card;
   border-radius: $radius-lg;
   background-color: $bg-card;
-  box-shadow: $shadow-card;
+  border: 1rpx solid $border-color;
 }
 
 .book-title {
@@ -251,7 +252,7 @@ onLoad((options) => {
   font-weight: 600;
   color: $color-white;
   background-color: $brand;
-  border-radius: $radius-pill;
+  border-radius: $radius-btn;
 }
 
 .submit-btn.disabled {

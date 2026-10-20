@@ -9,7 +9,7 @@
         :show-scrollbar="false"
         refresher-enabled
         :refresher-triggered="refreshing"
-        refresher-background="#F4F5F7"
+        refresher-background="#f5f5f5"
         @refresherrefresh="onRefresh"
         @scrolltolower="loadMore"
       >
@@ -460,7 +460,7 @@ onLoad((options) => {
   font-weight: 600;
   color: $color-white;
   background-color: $brand;
-  border-radius: $radius-pill;
+  border-radius: $radius-btn;
 }
 
 .row-add.disabled {

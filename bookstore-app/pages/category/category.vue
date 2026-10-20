@@ -63,7 +63,7 @@
           :show-scrollbar="false"
           refresher-enabled
           :refresher-triggered="refreshing"
-          refresher-background="#F4F5F7"
+          refresher-background="#f5f5f5"
           @refresherrefresh="onRefresh"
           @scrolltolower="loadMore"
         >
@@ -571,7 +571,7 @@ onUnmounted(() => {
   align-items: center;
   padding: 0 $sp-3;
   background-color: $bg-page;
-  border-radius: $radius-pill;
+  border-radius: $radius-btn;
 }
 
 .search-icon {
@@ -740,7 +740,7 @@ onUnmounted(() => {
   font-size: $fs-sm;
   color: $text-regular;
   background-color: $bg-card;
-  border-radius: $radius-pill;
+  border-radius: $radius-btn;
 }
 
 .mini-chip.on {

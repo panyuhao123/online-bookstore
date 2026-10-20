@@ -301,7 +301,7 @@ onReachBottom(() => {
   margin-bottom: $gap-item;
   border-radius: $radius-lg;
   background-color: $bg-card;
-  box-shadow: $shadow-card;
+  border: 1rpx solid $border-color;
 }
 
 .card-top {
@@ -427,7 +427,7 @@ onReachBottom(() => {
   font-weight: 600;
   color: $brand;
   background-color: $brand-weak;
-  border-radius: $radius-pill;
+  border-radius: $radius-btn;
 }
 
 .op-btn.disabled {

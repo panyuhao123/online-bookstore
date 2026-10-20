@@ -7,31 +7,37 @@
     <view class="bar-row">
       <text class="logo">书</text>
 
-      <!-- 可编辑态（列表页）：内嵌输入框，回车即搜索 -->
-      <view v-if="editable" class="search-box">
-        <text class="search-icon">⌕</text>
-        <input
-          class="search-input"
-          v-model="inputText"
-          :placeholder="placeholder"
-          placeholder-class="ph"
-          confirm-type="search"
-          :focus="autofocus"
-          @confirm="submit"
-        />
-        <text v-if="inputText" class="clear-btn" @tap="clear">×</text>
-      </view>
-      <!-- 只读态（首页等）：整块点击跳搜索页，避免在每个页面重复写跳转 -->
-      <view v-else class="search-box" hover-class="hover-dim" @tap="$emit('search-tap')">
-        <text class="search-icon">⌕</text>
-        <text class="ph ellipsis">{{ keyword || placeholder }}</text>
+      <!-- 搜索区：输入框与橙色按钮拼成一个整体，共享一圈橙色边框、内部无间隙。
+           这是当当最标志性的一个组件，也是「橙 = 路」的唯一落点。 -->
+      <view class="search-bar">
+        <!-- 可编辑态（列表页）：内嵌输入框，回车即搜索 -->
+        <view v-if="editable" class="search-box">
+          <text class="search-icon">⌕</text>
+          <input
+            class="search-input"
+            v-model="inputText"
+            :placeholder="placeholder"
+            placeholder-class="ph"
+            confirm-type="search"
+            :focus="autofocus"
+            @confirm="submit"
+          />
+          <text v-if="inputText" class="clear-btn" @tap="clear">×</text>
+        </view>
+        <!-- 只读态（首页等）：整块点击跳搜索页，避免在每个页面重复写跳转 -->
+        <view v-else class="search-box" hover-class="hover-dim" @tap="$emit('search-tap')">
+          <text class="search-icon">⌕</text>
+          <text class="ph ellipsis">{{ keyword || placeholder }}</text>
+        </view>
+
+        <view class="search-btn" hover-class="hover-opacity" @tap.stop="onSearchBtn">搜索</view>
       </view>
 
       <view class="icon-btn" hover-class="hover-scale" @tap="goOrders">
-        <entry-icon name="order" tone="orange" size="small" />
+        <entry-icon name="order" tone="grey" size="small" />
       </view>
       <view class="icon-btn" hover-class="hover-scale" @tap="goMine">
-        <entry-icon name="mine" tone="teal" size="small" />
+        <entry-icon name="mine" tone="grey" size="small" />
       </view>
     </view>
   </view>
@@ -96,6 +102,12 @@ function clear() {
   emit('search', '')
 }
 
+/** 「搜索」按钮：可编辑态直接提交，只读态等同点击整块搜索区 */
+function onSearchBtn() {
+  if (props.editable) submit()
+  else emit('search-tap')
+}
+
 /** 需登录的入口统一引导，避免用户点了才发现没登录 */
 function goIfLogin(url) {
   if (!isLogin()) {
@@ -148,24 +160,49 @@ function goMine() {
   border-radius: $radius-md;
 }
 
-.search-box {
+/* 搜索区整体：一圈 2rpx 橙边 + 外侧小圆角，内部两段无间隙 */
+.search-bar {
   flex: 1;
   min-width: 0;
   height: 64rpx;
   display: flex;
   flex-direction: row;
   align-items: center;
-  padding: 0 $sp-3;
-  background-color: $bg-page;
-  border: 1rpx solid $brand;
-  border-radius: $radius-pill;
+  background-color: $bg-card;
+  border: 2rpx solid $orange;
+  border-radius: $radius-md;
+  overflow: hidden;
+}
+
+.search-box {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 0 $sp-2 0 $sp-3;
+  background-color: $bg-card;
+}
+
+.search-btn {
+  flex-shrink: 0;
+  width: 108rpx;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: $fs-sm;
+  font-weight: 600;
+  color: $color-white;
+  background-color: $orange;
 }
 
 .search-icon {
   flex-shrink: 0;
   margin-right: $sp-2;
   font-size: $fs-lg;
-  color: $brand;
+  color: $orange;
 }
 
 .search-input {

@@ -24,8 +24,11 @@ $web-max: 1200px;   /* 主内容区最大宽，与 web-header 的 .wh-inner 保�
 $web-pad: 24px;     /* 主内容区左右内边距 */
 
 /* 固定元素的内容对齐：与 .page 的居中区域对齐。
-   用 max() 兜底，避免视口略小于 1200 时算出负 padding。 */
-$web-gutter: max(#{$web-pad}, calc((100% - #{$web-max}) / 2 + #{$web-pad}));
+   用 max() 兜底，避免视口略小于 1200 时算出负 padding。
+   注意写成 calc(max(...)) 而不是 max(a, calc(...))：后者把 calc 当 Sass 函数参数解析，
+   libsass 会报「"24px" is not a number for `max'」，前者两种编译器都按原样输出，
+   对老浏览器也更安全（嵌套 calc 在 max 内的支持晚于 calc 本身）。 */
+$web-gutter: calc(max(#{$web-pad}, (100% - #{$web-max}) / 2 + #{$web-pad}));
 
 /* 桌面顶栏总高度。
    web-header 的真实高度、page-nav 的下移距离、页面自挂顶栏的占位高度

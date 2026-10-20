@@ -166,7 +166,7 @@ onShow(() => {
   margin-bottom: $gap-item;
   border-radius: $radius-lg;
   background-color: $bg-card;
-  box-shadow: $shadow-card;
+  border: 1rpx solid $border-color;
 }
 
 .row-1 {
@@ -271,7 +271,7 @@ onShow(() => {
   font-weight: 600;
   color: $color-white;
   background-color: $brand;
-  border-radius: $radius-pill;
+  border-radius: $radius-btn;
   z-index: 20;
 }
 </style>

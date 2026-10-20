@@ -9,7 +9,7 @@
         :show-scrollbar="false"
         refresher-enabled
         :refresher-triggered="refreshing"
-        refresher-background="#F4F5F7"
+        refresher-background="#f5f5f5"
         @refresherrefresh="onRefresh"
         @scrolltolower="loadMore"
       >
@@ -160,9 +160,11 @@ const sortOptions = [
   { label: '热度', value: 'sales' }
 ]
 
-/** Banner 底色：与 UI 规范的柔和浅色系一致 */
+/** Banner 底色：与 UI 规范的柔和浅色系一致。
+ *  第 1 档 = 品牌弱底的浅/深两阶（$brand-weak → $brand-weak-deep），
+ *  内联 style 取不到 SCSS Token，改主色时这里要手动同步。 */
 const bannerBg = [
-  'linear-gradient(120deg, #f7e8e4 0%, #eed3cd 100%)',
+  'linear-gradient(120deg, #fff1f0 0%, #ffe3e3 100%)',
   'linear-gradient(120deg, #e9eef7 0%, #d5e0f0 100%)',
   'linear-gradient(120deg, #ecf2ea 0%, #dae7d7 100%)'
 ]
@@ -340,7 +342,7 @@ onLoad(() => {
   font-size: $fs-xs;
   font-weight: 600;
   color: $color-white;
-  background: linear-gradient(135deg, #e4574e 0%, #a62a24 100%);
+  background: linear-gradient(135deg, $brand-light 0%, $brand-dark 100%);
   border-radius: $radius-sm;
 }
 
@@ -439,7 +441,7 @@ onLoad(() => {
   font-size: $fs-sm;
   color: $text-regular;
   background-color: $bg-fill;
-  border-radius: $radius-pill;
+  border-radius: $radius-btn;
 }
 
 .chip-item.on {

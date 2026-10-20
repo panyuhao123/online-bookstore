@@ -330,7 +330,7 @@ onLoad((options) => {
   padding: $gap-card;
   border-radius: $radius-lg;
   background-color: $bg-card;
-  box-shadow: $shadow-card;
+  border: 1rpx solid $border-color;
 }
 
 .card-title {
@@ -393,7 +393,7 @@ onLoad((options) => {
   font-weight: 600;
   color: $brand;
   border: 1rpx solid $brand;
-  border-radius: $radius-pill;
+  border-radius: $radius-btn;
 }
 
 .rv-done {
@@ -512,7 +512,7 @@ onLoad((options) => {
   font-weight: 600;
   color: $color-white;
   background-color: $brand;
-  border-radius: $radius-pill;
+  border-radius: $radius-btn;
 }
 
 .pay-btn.disabled {

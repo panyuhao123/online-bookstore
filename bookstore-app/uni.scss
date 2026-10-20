@@ -3,29 +3,46 @@
  * 只放变量、mixin，不要写具体样式规则。
  *
  * 规范出处：docs/线上书店App_UI设计规范.md
+ * 视觉语言出处：bookstore-web/DESIGN.md（与 PC 商城端共用同一套色板与分层规则）
  * 基准屏宽 750rpx（逻辑 375px），1rpx ≈ 0.5px。
  * 页面样式只允许引用这里的 Token，禁止硬编码色值与字号。
+ *
+ * ---- 与 PC 端一致、与 PC 端不同的地方 ----
+ * 一致：色板（红 = 价格与主操作，橙 = 导航与购物车）、灰底白块、用 1rpx 边框分层
+ *      而不是阴影、小圆角（不用胶囊按钮）。
+ * 不同：PC 正文 12px 直接照搬到手机上不可读，故正文仍是 26–28rpx（13–14px）；
+ *      辅助文字用 #8c9099（对白底 4.6:1，AA）而非 PC 的 #999（2.85:1，未达标）。
+ *      布局不做「缩小版 Web」：不打三段式顶栏、不做多栏密集网格、不用桌面级字号。
  */
 
-/* ================= 品牌色 ================= */
-$brand: #c8362f;          /* 朱砂红：主按钮、选中态、Tab 选中（白底对比 5.9:1 AA） */
-$brand-light: #e4574e;    /* 渐变端点、按压态 */
-$brand-dark: #a62a24;     /* 按压加深 */
-$brand-weak: #fdecea;     /* 标签底、弱提示底 */
+/* ================= 品牌色（红 = 钱） ================= */
+$brand: #ff2832;          /* 主红：价格、主按钮、选中态、Tab 选中（白底 3.9:1，仅用于大字与大色块） */
+$brand-light: #ff6b71;    /* 渐变浅端、按压态（必须比 $brand 亮，否则渐变方向倒挂） */
+$brand-dark: #e6162d;     /* 按压加深、榜单名次块 */
+$brand-weak: #fff1f0;     /* 浅红底：选中态背景、价格区块底、促销标签底 */
+$brand-weak-deep: #ffe3e3; /* 浅红底的加深档：hover 时从 $brand-weak 再深一格，避免颜色跳变 */
+
+/* ================= 橙（路 = 导航 / 搜索 / 购物车） ================= */
+/* 与红分工明确：橙只出现在「去哪里」的控件上，绝不用在价格或结算按钮上 */
+$orange: #ff6f00;
+$orange-light: #ff8f00;
+$orange-dark: #e65f00;
+$orange-weak: #fff4e8;
 
 /* ================= 文字色 ================= */
-$text-main: #1f2126;      /* 标题 / 书名 / 金额（15.3:1 AAA） */
-$text-regular: #4e5259;   /* 正文 / 作者 / 表单值（8.2:1 AAA） */
-$text-sub: #8c9099;       /* 时间 / 销量 / 辅助（4.6:1 AA） */
+$text-main: #333333;      /* 标题 / 书名 / 金额（12.6:1 AAA） */
+$text-regular: #666666;   /* 正文 / 作者 / 表单值（5.7:1 AA） */
+$text-sub: #8c9099;       /* 时间 / 销量 / 辅助（4.6:1 AA，不用 PC 的 #999） */
 $text-placeholder: #b9bdc4; /* 输入框占位符 */
 
 /* ================= 背景与边框 ================= */
-$bg-page: #f4f5f7;        /* 页面背景 */
+$bg-page: #f5f5f5;        /* 页面背景（与 PC 同一片灰） */
 $bg-card: #ffffff;        /* 卡片 / 底栏 */
-$bg-skeleton: #ebecef;    /* 骨架屏 */
-$bg-fill: #f0f1f3;        /* 输入框填充、次要按钮底 */
-$border-color: #edeef0;   /* 1rpx 分割线 */
-$border-strong: #d8d9dc;  /* 描边、复选框未选 */
+$bg-skeleton: #ededed;    /* 骨架屏（需在 #f5f5f5 底上可见） */
+$bg-fill: #f7f7f7;        /* 输入框填充、次要按钮底、表头 */
+$border-color: #e5e5e5;   /* 卡片边框、列表分割线（主要分隔手段） */
+$border-light: #f0f0f0;   /* 卡片内部细分隔（优先虚线） */
+$border-strong: #d9d9d9;  /* 描边、复选框未选、禁用底 */
 
 /* ================= 语义色 ================= */
 $success: #2f9e44;
@@ -47,9 +64,10 @@ $color-white: #ffffff;
 $bg-icon-muted: #e9eaed;
 
 /* ================= 价格色 ================= */
-$price-color: #c8362f;    /* 与品牌同色，靠字重/字号区分层级 */
+$price-color: #ff2832;    /* 与品牌同色，靠字重与字号拉开层级 */
 
 /* ================= 字号层级（rpx） ================= */
+/* 移动端可读性底线：正文 ≥ 26rpx（13px），辅助 ≥ 22rpx（11px）。不跟随 PC 的 12px。 */
 $fs-3xl: 48rpx;   /* 详情页价格 */
 $fs-2xl: 40rpx;   /* 页面主标题、状态头 */
 $fs-xl: 34rpx;    /* 卡片书名、区块标题、列表价格 */
@@ -76,15 +94,19 @@ $gap-item: 20rpx;    /* 卡片之间 */
 $gap-block: 32rpx;   /* 区块之间 */
 
 /* ================= 圆角 ================= */
-$radius-sm: 8rpx;     /* 封面、小标签 */
-$radius-md: 12rpx;    /* 输入框、图片 */
-$radius-lg: 20rpx;    /* 卡片（统一） */
-$radius-pill: 999rpx; /* 按钮、Chip、胶囊 */
+/* 电商用直角：卡片与按钮只做 4px 级圆角，胶囊只留给「真圆形」元素
+   （圆点、数字角标、步进器、评分分布条、头像）。 */
+$radius-sm: 4rpx;     /* 封面、小标签（2px） */
+$radius-md: 8rpx;     /* 输入框、图片（4px） */
+$radius-lg: 8rpx;     /* 卡片（4px，不再是 20rpx） */
+$radius-btn: 8rpx;    /* 按钮、Chip、搜索框（4px，替代原胶囊） */
+$radius-pill: 999rpx; /* 仅限真圆形元素，不要给按钮用 */
 
 /* ================= 阴影 ================= */
-$shadow-card: 0 2rpx 12rpx rgba(31, 33, 38, 0.05);
-$shadow-card-hover: 0 8rpx 24rpx rgba(31, 33, 38, 0.1);
-$shadow-float: 0 -4rpx 20rpx rgba(31, 33, 38, 0.08);
+/* 只有两级：静态卡片无阴影（靠 1rpx 边框与底色对比），浮层才有一层。 */
+$shadow-card: none;
+$shadow-card-hover: 0 8rpx 24rpx rgba(0, 0, 0, 0.1);
+$shadow-float: 0 -4rpx 20rpx rgba(0, 0, 0, 0.06);
 
 /* ================= 尺寸 ================= */
 $touch-min: 88rpx;      /* 最小触控区 44px */
@@ -96,28 +118,29 @@ $safe-bottom: env(safe-area-inset-bottom);
 
 /* ================= Mixin ================= */
 
-/* 卡片：白底 + 统一圆角 + 轻阴影 */
+/* 卡片：白底 + 1rpx 边框 + 小圆角，无阴影 */
 @mixin card($radius: $radius-lg, $margin-bottom: $gap-item) {
   background-color: $bg-card;
+  border: 1rpx solid $border-color;
   border-radius: $radius;
-  box-shadow: $shadow-card;
   margin-bottom: $margin-bottom;
 }
 
-/* 固定底栏：白底 + 上阴影 + 安全区 */
+/* 固定底栏：白底 + 上边框 + 安全区 */
 @mixin float-bar {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
   background-color: $bg-card;
+  border-top: 1rpx solid $border-color;
   box-shadow: $shadow-float;
   padding: $sp-2 $gap-page;
   padding-bottom: calc($sp-2 + $safe-bottom);
   z-index: 20;
 }
 
-/* 主按钮：品牌底 + 全圆角 + 禁用态（用灰底而非降透明度，避免误认为可点） */
+/* 主按钮：品牌底 + 小圆角 + 禁用态（用灰底而非降透明度，避免误认为可点） */
 @mixin btn-primary($height: $btn-h) {
   height: $height;
   min-width: 200rpx;
@@ -129,7 +152,7 @@ $safe-bottom: env(safe-area-inset-bottom);
   font-weight: 600;
   color: #ffffff;
   background-color: $brand;
-  border-radius: $radius-pill;
+  border-radius: $radius-btn;
   transition: opacity 0.15s;
 
   &:active {
@@ -155,7 +178,7 @@ $safe-bottom: env(safe-area-inset-bottom);
   color: $brand;
   background-color: $bg-card;
   border: 1rpx solid $brand;
-  border-radius: $radius-pill;
+  border-radius: $radius-btn;
 
   &:active {
     opacity: 0.7;

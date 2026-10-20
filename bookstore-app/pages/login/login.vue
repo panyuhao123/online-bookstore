@@ -179,7 +179,7 @@ onLoad(() => {
   padding: 0 $sp-4;
   border-radius: $radius-lg;
   background-color: $bg-card;
-  box-shadow: $shadow-card;
+  border: 1rpx solid $border-color;
 }
 
 .field {
@@ -227,7 +227,7 @@ onLoad(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: $radius-pill;
+  border-radius: $radius-btn;
   font-size: 32rpx;
   font-weight: 600;
   color: $color-white;

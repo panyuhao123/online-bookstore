@@ -340,7 +340,7 @@ function goOrder() {
   /* 选中项的悬停保持品牌弱底，只做轻微加深，避免颜色跳变 */
   .wh-nav-item.on:hover {
     color: $brand;
-    background-color: #f9d7d4;
+    background-color: $brand-weak-deep;
   }
 
   .wh-cart:hover {

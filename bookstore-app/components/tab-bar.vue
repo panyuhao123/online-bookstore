@@ -111,6 +111,7 @@ function onTap(t) {
   display: flex;
   flex-direction: row;
   background-color: $bg-card;
+  border-top: 1rpx solid $border-color;
   box-shadow: $shadow-float;
   padding-bottom: $safe-bottom;
   z-index: 60;
@@ -173,6 +174,8 @@ function onTap(t) {
   justify-content: center;
   font-size: 18rpx;
   color: $color-white;
+  /* 与 PC 端 .cart-count 一致：角标是「数量」这种硬信息，用红；
+     橙色只属于购物车入口本身，不参与数字强调 */
   background-color: $brand;
   border-radius: $radius-pill;
 }

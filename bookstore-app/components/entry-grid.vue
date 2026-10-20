@@ -65,7 +65,7 @@ function onTap(e) {
   padding: $gap-card $sp-2;
   background-color: $bg-card;
   border-radius: $radius-lg;
-  box-shadow: $shadow-card;
+  border: 1rpx solid $border-color;
 }
 
 .compact {
@@ -141,11 +141,11 @@ function onTap(e) {
   align-items: center;
   justify-content: center;
   margin-bottom: $sp-1;
-  border-radius: 24rpx;
+  border-radius: $radius-md;
 }
 
 /* 低饱和底 + 同系深字，避免高饱和大色块抢走商品图的注意力 */
-.tone-orange { background-color: #fff1e8; }
+.tone-orange { background-color: $orange-weak; }
 .tone-red    { background-color: $brand-weak; }
 .tone-blue   { background-color: #e6f1fb; }
 .tone-green  { background-color: #eaf3de; }

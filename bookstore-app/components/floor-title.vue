@@ -46,7 +46,9 @@ defineEmits(['more'])
   width: 8rpx;
   height: 32rpx;
   margin-right: $sp-2;
-  background-color: $brand;
+  /* 红→橙渐变，对应 PC 端楼层标题条的红橙渐变底色；
+     移动端标题不能铺渐变底（会压过书名），于是把渐变收到竖条上 */
+  background: linear-gradient(180deg, $brand 0%, $orange 100%);
   border-radius: $radius-sm;
 }
 

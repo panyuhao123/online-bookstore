@@ -230,7 +230,7 @@ onUnload(() => {
   padding: $gap-card;
   border-radius: $radius-lg;
   background-color: $bg-card;
-  box-shadow: $shadow-card;
+  border: 1rpx solid $border-color;
 }
 
 /* ---- 地址卡 ---- */
@@ -409,7 +409,7 @@ onUnload(() => {
   font-weight: 600;
   color: $color-white;
   background-color: $brand;
-  border-radius: $radius-pill;
+  border-radius: $radius-btn;
 }
 
 .submit.disabled {

@@ -82,36 +82,37 @@ page {
 
 .price {
   color: $price-color;
-  font-weight: 600;
+  font-weight: 700;
 }
 
-/* ---- 卡片（页面内通用，带 24rpx 左右外边距） ---- */
+/* ---- 卡片（页面内通用，带 24rpx 左右外边距） ----
+   层次靠 1rpx 边框，不靠阴影：阴影在灰色底上会发脏，且密集列表里叠十几层阴影更明显。 */
 .card {
   margin: 0 $gap-page $gap-item;
   padding: $gap-card;
   background-color: $bg-card;
+  border: 1rpx solid $border-color;
   border-radius: $radius-lg;
-  box-shadow: $shadow-card;
 }
 
 .card-flush {
   margin: 0 $gap-page $gap-item;
   padding: 0 $gap-card;
   background-color: $bg-card;
+  border: 1rpx solid $border-color;
   border-radius: $radius-lg;
-  box-shadow: $shadow-card;
   overflow: hidden;
 }
 
 .sec-title {
   font-size: $fs-xl;
-  font-weight: 600;
+  font-weight: 700;
   color: $text-main;
 }
 
 .divider {
   height: 1rpx;
-  background-color: $border-color;
+  background-color: $border-light;
 }
 
 /* ---- 按钮 ---- */
@@ -126,7 +127,7 @@ page {
   font-weight: 600;
   color: #ffffff;
   background-color: $brand;
-  border-radius: $radius-pill;
+  border-radius: $radius-btn;
 }
 
 /* 禁用用灰底而非降透明度：避免用户误以为仍可点击 */
@@ -146,7 +147,7 @@ page {
   color: $brand;
   background-color: $bg-card;
   border: 1rpx solid $brand;
-  border-radius: $radius-pill;
+  border-radius: $radius-btn;
 }
 
 .btn-text {
@@ -183,14 +184,16 @@ page {
   align-items: center;
   font-size: $fs-base;
   color: $text-regular;
-  background-color: $bg-fill;
-  border-radius: $radius-pill;
+  background-color: $bg-card;
+  border: 1rpx solid $border-color;
+  border-radius: $radius-btn;
 }
 
 .chip.active {
   color: #ffffff;
   font-weight: 600;
   background-color: $brand;
+  border-color: $brand;
 }
 
 .tag {
@@ -216,7 +219,7 @@ page {
   padding: 3rpx 14rpx;
   font-size: $fs-xs;
   color: $warning;
-  background-color: #fff4e5;
+  background-color: $warning-weak;
   border-radius: $radius-sm;
 }
 
@@ -300,7 +303,7 @@ page {
   font-weight: 600;
   color: #ffffff;
   background-color: $brand;
-  border-radius: $radius-pill;
+  border-radius: $radius-btn;
 }
 
 .load-more {
@@ -322,6 +325,7 @@ page {
   padding: $sp-2 $gap-page;
   padding-bottom: calc(#{$sp-2} + #{$safe-bottom});
   background-color: $bg-card;
+  border-top: 1rpx solid $border-color;
   box-shadow: $shadow-float;
   z-index: 20;
 }

@@ -34,6 +34,11 @@ import { listBanners, createBanner, updateBanner, updateBannerStatus, deleteBann
 import { pageBooklists, getBooklist, updateBooklistStatus, deleteBooklist } from '../booklist'
 import { listConfigs, updateConfig } from '../config'
 import { pageStockNoticeSummary, markStockNoticeNotified } from '../stock-notice'
+import { pageOrders, batchShipOrders, exportOrders } from '../order'
+import { bookSummary } from '../book'
+import { userSummary } from '../user'
+import { reviewSummary } from '../review'
+import { overview } from '../admin'
 
 /** 取最后一次调用的 { method, args } */
 function lastCall() {
@@ -142,5 +147,98 @@ describe('api/stock-notice —— 到货提醒看板', () => {
   it('标记已通知：PUT /api/admin/stock-notice/{bookId}/notify（幂等）', async () => {
     await markStockNoticeNotified(12)
     expect(lastCall()).toEqual({ method: 'put', args: ['/api/admin/stock-notice/12/notify'] })
+  })
+})
+
+describe('api/order —— 订单筛选参数形态', () => {
+  beforeEach(() => {
+    mock.calls.length = 0
+  })
+
+  it('分页：日期区间走 createTimeStart / createTimeEnd（后端按 LocalDate 接收）', async () => {
+    const params = {
+      orderNo: '202610',
+      status: 2,
+      pageNum: 1,
+      pageSize: 10,
+      createTimeStart: '2026-09-20',
+      createTimeEnd: '2026-10-20'
+    }
+    await pageOrders(params)
+    expect(lastCall()).toEqual({ method: 'get', args: ['/api/admin/order/page', { params }] })
+  })
+
+  it('清空筛选时不传空字符串：undefined 的键不会出现在 query 里', async () => {
+    const params = {
+      orderNo: undefined,
+      status: undefined,
+      pageNum: 1,
+      pageSize: 10,
+      createTimeStart: undefined,
+      createTimeEnd: undefined
+    }
+    await pageOrders(params)
+    const sent = lastCall().args[1].params
+    expect(Object.keys(sent).filter((k) => sent[k] === undefined)).toEqual([
+      'orderNo',
+      'status',
+      'createTimeStart',
+      'createTimeEnd'
+    ])
+  })
+})
+
+describe('api/admin —— 工作台状态分布字段', () => {
+  beforeEach(() => {
+    mock.calls.length = 0
+  })
+
+  it('概览：GET /api/admin/dashboard（statusCounts 由后端算好，前端不再二次聚合）', async () => {
+    await overview()
+    expect(lastCall()).toEqual({ method: 'get', args: ['/api/admin/dashboard'] })
+  })
+})
+
+describe('api/order —— 批量发货与导出', () => {
+  beforeEach(() => {
+    mock.calls.length = 0
+  })
+
+  it('批量发货：POST /api/admin/order/batch-ship，ids 放 body 而不是 query', async () => {
+    await batchShipOrders([1, 2, 3])
+    expect(lastCall()).toEqual({
+      method: 'post',
+      args: ['/api/admin/order/batch-ship', { ids: [1, 2, 3] }]
+    })
+  })
+
+  it('导出：GET /api/admin/order/export 且必须带 responseType=blob', async () => {
+    const params = { status: 2, createTimeStart: '2026-10-01' }
+    await exportOrders(params)
+    expect(lastCall()).toEqual({
+      method: 'get',
+      args: ['/api/admin/order/export', { params, responseType: 'blob' }]
+    })
+  })
+})
+
+describe('api/列表页汇总 —— 四个列表页的汇总条数据源', () => {
+  beforeEach(() => {
+    mock.calls.length = 0
+  })
+
+  it('图书：GET /api/admin/book/summary', async () => {
+    await bookSummary()
+    expect(lastCall()).toEqual({ method: 'get', args: ['/api/admin/book/summary'] })
+  })
+
+  it('用户：GET /api/admin/user/summary', async () => {
+    await userSummary()
+    expect(lastCall()).toEqual({ method: 'get', args: ['/api/admin/user/summary'] })
+  })
+
+  it('评价：GET /api/admin/review/summary', async () => {
+    await reviewSummary()
+    expect(lastCall()).toEqual({ method: 'get', args: ['/api/admin/review/summary'] })
   })
 })

@@ -438,7 +438,10 @@ async function main() {
         const names = floors
           .map((f) => { const h = f.querySelector('.floor-title h2'); return h ? (h.innerText || '').trim() : ''; })
           .filter(Boolean);
-        return JSON.stringify({ count: floors.length, names: names.slice(0, 6) });
+        const subs = floors
+          .map((f) => { const s = f.querySelector('.floor-aside .floor-sub'); return s ? (s.innerText || '').trim() : ''; })
+          .filter(Boolean);
+        return JSON.stringify({ count: floors.length, names: names.slice(0, 6), subs: subs.slice(0, 6) });
       })()`)) || '{}'
       )
     )
@@ -446,6 +449,12 @@ async function main() {
       '首页按分类聚合楼层（N4，含分类名与图书卡片）',
       floorState.count >= 2 && (floorState.names || []).length >= 1,
       `楼层数=${floorState.count} 分类名=${JSON.stringify(floorState.names || [])}`
+    )
+    // D-10：楼层左侧的「N 本在售」必须是真的数字，不能是「0 本在售」或空缺
+    check(
+      '首页楼层显示真实书目数（D-10）',
+      (floorState.subs || []).some((s) => /^[1-9]\d*\s*本在售$/.test(s)),
+      `楼层说明=${JSON.stringify(floorState.subs || [])}`
     )
 
     // ---------- 10. 商品目录页（S6） ----------
@@ -457,7 +466,9 @@ async function main() {
         return JSON.stringify({
           tabs: document.querySelectorAll('.cat-tab').length,
           cards: document.querySelectorAll('.book-grid .book-card').length,
-          title: (document.querySelector('.page-title') || {}).innerText || ''
+          title: (document.querySelector('.page-title') || {}).innerText || '',
+          sub: (document.querySelector('.page-sub') || {}).innerText || '',
+          tabNums: [...document.querySelectorAll('.cat-tab .cnt')].map((e) => e.innerText.trim())
         });
       })()`)) || '{}'
       )
@@ -466,6 +477,21 @@ async function main() {
       '商品目录页按分类页签平铺图书（S6）',
       catalogState.tabs >= 2 && catalogState.cards > 0,
       `页签=${catalogState.tabs} 图书=${catalogState.cards} 标题=${String(catalogState.title || '').trim()}`
+    )
+    // D-10：分类书目数由后端 /api/category/list 提供。接口给对了不代表页面渲染出来，
+    // 中间任何一层没接上（字段名写错、v-if 条件写反）都只有这里能看到
+    check(
+      '目录页页签展示真实书目数（D-10）',
+      (catalogState.tabNums || []).length >= 2 &&
+        catalogState.tabNums.every((n) => /^\d+$/.test(n)) &&
+        catalogState.tabNums.some((n) => Number(n) > 0),
+      `页签数字=${JSON.stringify(catalogState.tabNums || [])}`
+    )
+    check(
+      '目录页头部显示「全店 N 个分类 · N 本在售」（D-10）',
+      /全店\s*\d+\s*个分类/.test(String(catalogState.sub || '')) &&
+        /\d+\s*本在售/.test(String(catalogState.sub || '')),
+      `头部=${String(catalogState.sub || '').replace(/\s+/g, ' ')}`
     )
 
     // ---------- 11. 目录页切分类：URL 与请求同步 ----------

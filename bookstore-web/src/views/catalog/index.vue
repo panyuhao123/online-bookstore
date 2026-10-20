@@ -68,16 +68,19 @@ const activeCategory = computed(
 )
 
 /**
- * `/api/category/list` 只返回 `{id,name,sort}`，**没有 `bookCount`**。
+ * `/api/category/list` 自 D-10 起返回 `bookCount`（**只统计上架图书**，口径见后端
+ * `CategoryMapper.selectOnSaleBookCounts()`）。
  *
- * <p>此前这里把各类的 `bookCount` 累加当"全店图书数"，页签上也逐类显示
- * `cat.bookCount || 0`，接口没有该字段 → 页面上写的是「全店 0 本图书」「小说 0」，
- * 而右侧分页信息又写着「共 102 本」，同一屏两个互相打架的数字。
+ * <p>此前该字段不存在，本页把各类的 `bookCount` 累加当"全店图书数"，
+ * 页面上写的是「全店 0 本图书」「小说 0」，而右侧分页信息又写着「共 102 本」，
+ * 同一屏两个互相打架的数字。
  *
- * <p>处置：本页不猜数。页签上的书目数只在后端真的给了 `bookCount` 时才渲染
- * （`v-if`），否则整段不显示；全店总数交给右侧分页信息（那是 `pageBooks` 的
- * `total`，唯一可信来源）。要真正补上分类书目数需要后端 VO 加字段，已记入待办。
+ * <p>注意页签数字与右侧「共 N 本」口径不同：页签是该分类的**上架总数**，
+ * 右侧是当前筛选条件下（含价格区间、关键词）的命中数，筛选后两者不相等是正常的。
  */
+const onSaleTotal = computed(() =>
+  categories.value.reduce((sum, c) => sum + (Number(c.bookCount) || 0), 0)
+)
 
 async function loadCategories() {
   categoryLoading.value = true
@@ -205,7 +208,7 @@ watch(
         <template v-if="activeCategory">
           「{{ activeCategory.name }}」共 {{ total }} 本
         </template>
-        <template v-else> 全店 {{ categories.length }} 个分类 </template>
+        <template v-else> 全店 {{ categories.length }} 个分类 · {{ onSaleTotal }} 本在售 </template>
       </p>
     </div>
 
@@ -217,6 +220,7 @@ watch(
         @click="setCategory(null)"
       >
         全部图书
+        <em v-if="onSaleTotal > 0" class="cnt">{{ onSaleTotal }}</em>
       </span>
       <span
         v-for="cat in categories"
@@ -226,7 +230,8 @@ watch(
         @click="setCategory(cat.id)"
       >
         {{ cat.name }}
-        <em v-if="cat.bookCount" class="cnt">{{ cat.bookCount }}</em>
+        <!-- 0 本也照实显示：藏着反而让用户以为页签坏了 -->
+        <em v-if="cat.bookCount !== null && cat.bookCount !== undefined" class="cnt">{{ cat.bookCount }}</em>
       </span>
     </div>
 

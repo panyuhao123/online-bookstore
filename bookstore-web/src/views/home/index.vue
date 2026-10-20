@@ -451,8 +451,8 @@ async function exportHotRank() {
         <div class="floor-aside">
           <div class="floor-title">
             <h2>{{ floor.category.name }}</h2>
-            <!-- 分类接口不返回 bookCount，这里不要写「0 本在售」 -->
-            <span class="floor-sub">按销量排序</span>
+            <!-- bookCount 只统计上架图书（D-10 起后端提供），空分类照实显示 0 -->
+            <span class="floor-sub">{{ floor.category.bookCount || 0 }} 本在售</span>
           </div>
           <div class="floor-links">
             <a @click="router.push('/books?categoryId=' + floor.category.id + '&sort=sales')">

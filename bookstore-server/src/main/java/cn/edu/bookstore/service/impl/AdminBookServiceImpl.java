@@ -39,6 +39,10 @@ import java.util.Map;
  *         管理端应改用「下架」。</li>
  * </ul>
  *
+ * <p>缓存：图书的增 / 改 / 上下架 / 删都会改变 {@code /api/category/list} 里的
+ * {@code bookCount}（该字段统计上架图书数），因此四个写方法都要连带清空 {@code category} 缓存。
+ * 漏掉任何一个，前台分类上的书目数就会一直停在旧值且没有任何报错。
+ *
  * @author 毕设项目组
  */
 @Slf4j
@@ -93,6 +97,7 @@ public class AdminBookServiceImpl implements AdminBookService {
     }
 
     @Override
+    @CacheEvict(value = {"book", "hotBook", "category"}, allEntries = true)
     public Long create(BookSaveRequest request) {
         validateCategory(request.getCategoryId());
         checkDuplicate(null, request.getTitle(), request.getAuthor());
@@ -105,7 +110,7 @@ public class AdminBookServiceImpl implements AdminBookService {
     }
 
     @Override
-    @CacheEvict(value = {"book", "hotBook"}, allEntries = true)
+    @CacheEvict(value = {"book", "hotBook", "category"}, allEntries = true)
     public void update(Long id, BookSaveRequest request) {
         Book existed = requireBook(id);
         validateCategory(request.getCategoryId());
@@ -120,7 +125,7 @@ public class AdminBookServiceImpl implements AdminBookService {
     }
 
     @Override
-    @CacheEvict(value = {"book", "hotBook"}, allEntries = true)
+    @CacheEvict(value = {"book", "hotBook", "category"}, allEntries = true)
     public void updateStatus(Long id, Integer status) {
         requireBook(id);
         if (status == null || (status != STATUS_ON_SALE && status != STATUS_OFF_SALE)) {
@@ -134,7 +139,7 @@ public class AdminBookServiceImpl implements AdminBookService {
     }
 
     @Override
-    @CacheEvict(value = {"book", "hotBook"}, allEntries = true)
+    @CacheEvict(value = {"book", "hotBook", "category"}, allEntries = true)
     public void delete(Long id) {
         requireBook(id);
         Long ordered = orderItemMapper.selectCount(

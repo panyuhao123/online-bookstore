@@ -17,7 +17,16 @@ public class CategoryVO {
 
     private Integer sort;
 
-    /** 该分类下的图书数量；仅管理端列表会填充，APP 端分类接口为 null */
+    /**
+     * 该分类下的图书数量。
+     *
+     * <p>口径按端区分，刻意不统一：
+     * <ul>
+     *     <li>前台 {@code /api/category/list}：只算<b>上架</b>图书（用户点进去能买到的数量）；</li>
+     *     <li>管理端 {@code /api/admin/category/list}：算<b>全部</b>图书（含下架，用于「有书就不许删分类」）。</li>
+     * </ul>
+     * 两个数字在同一分类上不一致属于设计如此，排查时勿当作缺陷。
+     */
     private Long bookCount;
 
     public static CategoryVO from(Category category) {

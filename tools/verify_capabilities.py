@@ -145,6 +145,26 @@ for k in ("code", "message", "data", "timestamp"):
     check(k in js, "统一返回结构含字段 %s" % k)
 check("requestId" in js, "统一返回结构含 requestId（链路追踪）")
 
+# D-10：分类书目数（只统计上架图书，用于前台「共 N 本 / 该分类 N 本」）
+check(all("bookCount" in c for c in cats), "每个分类都返回 bookCount 字段")
+check(all(isinstance(c.get("bookCount"), int) for c in cats),
+      "bookCount 为整数而非 null（前端拿 null 会渲染出「共 null 本」）")
+st, js = jreq("GET", "/api/book/page?pageNum=1&pageSize=5")
+on_sale_total = (js.get("data") or {}).get("total")
+sum_count = sum(int(c.get("bookCount") or 0) for c in cats)
+check(sum_count == on_sale_total,
+      "各分类 bookCount 之和 == 上架图书总数（%d vs %d）" % (sum_count, on_sale_total))
+check(all(int(c.get("bookCount") or 0) >= 0 for c in cats),
+      "bookCount 无负数（统计口径未算错）")
+# 抽一个分类核对：该分类下能查到的上架图书数应与其 bookCount 相等
+if cats:
+    c0 = cats[0]
+    st, js = jreq("GET", "/api/book/page?pageNum=1&pageSize=1&categoryId=%s" % c0.get("id"))
+    cat_total = (js.get("data") or {}).get("total")
+    check(cat_total == c0.get("bookCount"),
+          "分类「%s」bookCount=%s 与实际可查图书数 %s 一致"
+          % (c0.get("name"), c0.get("bookCount"), cat_total))
+
 print()
 print("=" * 68)
 print("第 1 步：分页 + 条件筛选（R1）")

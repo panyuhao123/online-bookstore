@@ -48,6 +48,10 @@ public class AdminCategoryServiceImpl implements AdminCategoryService {
         }
         // 逐个分类统计图书数：分类数量本就有限（十几个），逐条 COUNT 的开销远小于
         // 引入一次全表分组查询带来的复杂度，属于明确的数据量权衡
+        //
+        // 口径刻意与前台不同：这里统计**全部图书**（含已下架）。用途是「有书就不许删分类」的
+        // 删除保护，下架书同样占着这个分类，算进去才能拦住误删；而前台 /api/category/list 的
+        // bookCount 只算上架（用户点进去能买的），两处数字不一致是设计如此，不是 bug。
         return categories.stream().map(category -> {
             CategoryVO vo = CategoryVO.from(category);
             vo.setBookCount(nvl(bookMapper.selectCount(

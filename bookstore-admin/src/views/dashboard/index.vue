@@ -134,21 +134,13 @@
 </template>
 
 <script setup>
+import { STATUS_META } from '@/utils/order-status'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
 import { Refresh } from '@element-plus/icons-vue'
 import { overview, salesTrend, topBooks } from '@/api/admin'
 import { pageOrders } from '@/api/order'
-
-/** 状态口径与后端 OrderStatus 对齐；颜色只在这里定义一份，图表与胶囊共用 */
-const STATUS_META = [
-  { status: 1, text: '待支付', color: '#E09520', tone: 'warn' },
-  { status: 2, text: '已支付', color: '#6C4DF2', tone: 'brand' },
-  { status: 3, text: '已发货', color: '#3E7BDB', tone: 'info' },
-  { status: 4, text: '已完成', color: '#1F9D63', tone: 'ok' },
-  { status: 5, text: '已取消', color: '#B4BAC6', tone: 'gray' }
-]
 
 const BRAND = '#6C4DF2'
 

@@ -126,6 +126,7 @@
 </template>
 
 <script setup>
+import { formatTime } from '@/utils/format'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
@@ -144,10 +145,6 @@ const form = reactive({ id: null, name: '', sort: 100 })
 
 const rules = {
   name: [{ required: true, message: '请输入分类名称', trigger: 'blur' }]
-}
-
-function formatTime(value) {
-  return value ? String(value).replace('T', ' ') : '-'
 }
 
 /** 书目合计：bookCount 由后端给出（管理端口径含已下架，用于删除保护） */

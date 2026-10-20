@@ -153,6 +153,7 @@
 </template>
 
 <script setup>
+import { formatTime } from '@/utils/format'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Picture } from '@element-plus/icons-vue'
@@ -210,10 +211,6 @@ function validateLink(rule, value, callback) {
 const rules = {
   title: [{ required: true, message: '请输入标题', trigger: 'blur' }],
   linkUrl: [{ validator: validateLink, trigger: 'blur' }]
-}
-
-function formatTime(value) {
-  return value ? String(value).replace('T', ' ') : '-'
 }
 
 /** 有图用图、无图用背景样式 —— 与商城端首页 bannerStyle 同一套判断 */

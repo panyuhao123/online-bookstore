@@ -87,6 +87,7 @@
 </template>
 
 <script setup>
+import { formatTime } from '@/utils/format'
 import { ref, reactive, onMounted } from 'vue'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import { pageLogs, logModules } from '@/api/log'
@@ -103,10 +104,6 @@ const query = reactive({
   pageNum: 1,
   pageSize: 10
 })
-
-function formatTime(value) {
-  return value ? String(value).replace('T', ' ') : '-'
-}
 
 async function load() {
   loading.value = true

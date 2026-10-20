@@ -151,6 +151,7 @@
 </template>
 
 <script setup>
+import { formatTime } from '@/utils/format'
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh, Search } from '@element-plus/icons-vue'
@@ -172,10 +173,6 @@ const query = reactive({
   pageNum: 1,
   pageSize: 10
 })
-
-function formatTime(value) {
-  return value ? String(value).replace('T', ' ') : '-'
-}
 
 /** 用户 ID 只接受数字：清空时传 null（后端按「不筛选」处理），非法输入直接不传 */
 function buildParams() {

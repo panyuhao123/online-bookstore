@@ -271,6 +271,8 @@
 </template>
 
 <script setup>
+import { STATUS_META } from '@/utils/order-status'
+import { formatTime } from '@/utils/format'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -279,15 +281,6 @@ import {
   pageOrders, getOrder, shipOrder, batchShipOrders, exportOrders, cancelTimeoutOrders
 } from '@/api/order'
 import { overview } from '@/api/admin'
-
-/** 与后端 OrderStatus 枚举保持一致：1待支付 2已支付 3已发货 4已完成 5已取消 */
-const STATUS_META = [
-  { status: 1, text: '待支付', color: '#E09520', tone: 'warn' },
-  { status: 2, text: '已支付', color: '#6C4DF2', tone: 'brand' },
-  { status: 3, text: '已发货', color: '#3E7BDB', tone: 'info' },
-  { status: 4, text: '已完成', color: '#1F9D63', tone: 'ok' },
-  { status: 5, text: '已取消', color: '#B4BAC6', tone: 'gray' }
-]
 
 /**
  * 快捷区间在前端算好日期字符串再传给后端，而不是把「近 7 天」这种语义传给后端：
@@ -325,10 +318,6 @@ const query = reactive({
 
 function money(value) {
   return Number(value || 0).toFixed(2)
-}
-
-function formatTime(value) {
-  return value ? String(value).replace('T', ' ') : '—'
 }
 
 /** 手机号脱敏：列表页会被投屏演示，完整号码没必要整屏铺开 */

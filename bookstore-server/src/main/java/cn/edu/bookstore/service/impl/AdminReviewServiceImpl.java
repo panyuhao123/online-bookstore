@@ -5,6 +5,7 @@ import cn.edu.bookstore.common.ErrorCode;
 import cn.edu.bookstore.entity.Review;
 import cn.edu.bookstore.mapper.ReviewMapper;
 import cn.edu.bookstore.model.dto.AdminReviewQuery;
+import cn.edu.bookstore.model.vo.AdminReviewSummaryVO;
 import cn.edu.bookstore.model.vo.AdminReviewVO;
 import cn.edu.bookstore.model.vo.PageVO;
 import cn.edu.bookstore.service.AdminReviewService;
@@ -42,6 +43,20 @@ public class AdminReviewServiceImpl implements AdminReviewService {
                 query.getStatus(),
                 StrUtil.trimToNull(query.getKeyword()));
         return PageVO.of(page);
+    }
+
+    @Override
+    public AdminReviewSummaryVO summary() {
+        AdminReviewSummaryVO summary = reviewMapper.selectAdminSummary();
+        if (summary == null) {
+            summary = new AdminReviewSummaryVO();
+            summary.setTotal(0L);
+            summary.setVisible(0L);
+            summary.setHidden(0L);
+        }
+        // avgRating 为 null 表示「没有正常评价」：保持 null 让前端显示「—」，
+        // 补 0 会被理解成「评分 0 分」，是两件完全不同的事。
+        return summary;
     }
 
     @Override

@@ -1,6 +1,7 @@
 package cn.edu.bookstore.mapper;
 
 import cn.edu.bookstore.entity.Review;
+import cn.edu.bookstore.model.vo.AdminReviewSummaryVO;
 import cn.edu.bookstore.model.vo.AdminReviewVO;
 import cn.edu.bookstore.model.vo.BookRatingStatVO;
 import cn.edu.bookstore.model.vo.ReviewSummaryVO;
@@ -22,6 +23,20 @@ import java.util.List;
  * @author 毕设项目组
  */
 public interface ReviewMapper extends BaseMapper<Review> {
+
+    /**
+     * 评价管理页的汇总指标。
+     *
+     * <p>平均分用 {@code AVG(CASE WHEN status = 1 THEN rating END)} 只算正常评价：
+     * 隐藏违规评价后分数应当立刻反映出来，否则运营会怀疑「隐藏没生效」。
+     * 用 CASE 而不是 WHERE status = 1，是为了让「总数 / 正常 / 隐藏 / 平均分」一条 SQL 出齐。
+     */
+    @Select("SELECT COUNT(*) AS total, "
+            + "COALESCE(SUM(status = 1), 0) AS visible, "
+            + "COALESCE(SUM(status = 0), 0) AS hidden, "
+            + "ROUND(AVG(CASE WHEN status = 1 THEN rating END), 1) AS avg_rating "
+            + "FROM review")
+    AdminReviewSummaryVO selectAdminSummary();
 
     /**
      * 批量统计多本图书的评分与评价数。

@@ -10,6 +10,7 @@ import cn.edu.bookstore.mapper.CategoryMapper;
 import cn.edu.bookstore.mapper.OrderItemMapper;
 import cn.edu.bookstore.model.dto.AdminBookQuery;
 import cn.edu.bookstore.model.dto.BookSaveRequest;
+import cn.edu.bookstore.model.vo.AdminBookSummaryVO;
 import cn.edu.bookstore.model.vo.BookVO;
 import cn.edu.bookstore.model.vo.CategoryVO;
 import cn.edu.bookstore.model.vo.PageVO;
@@ -87,6 +88,21 @@ public class AdminBookServiceImpl implements AdminBookService {
             vo.setCategoryName(categoryNameMap.get(book.getCategoryId()));
             return vo;
         });
+    }
+
+    @Override
+    public AdminBookSummaryVO summary() {
+        AdminBookSummaryVO summary = bookMapper.selectAdminSummary();
+        // 空表时聚合查询仍返回一行，但字段可能为 null（COALESCE 兜住 SUM，COUNT 天然为 0），这里再保一层
+        if (summary == null) {
+            summary = new AdminBookSummaryVO();
+            summary.setTotal(0L);
+            summary.setOnSale(0L);
+            summary.setOffSale(0L);
+            summary.setLowStock(0L);
+            summary.setTotalStock(0L);
+        }
+        return summary;
     }
 
     @Override

@@ -4,6 +4,7 @@ import cn.edu.bookstore.common.Result;
 import cn.edu.bookstore.common.log.OpLog;
 import cn.edu.bookstore.model.dto.AdminBookQuery;
 import cn.edu.bookstore.model.dto.BookSaveRequest;
+import cn.edu.bookstore.model.vo.AdminBookSummaryVO;
 import cn.edu.bookstore.model.vo.BookVO;
 import cn.edu.bookstore.model.vo.PageVO;
 import cn.edu.bookstore.service.AdminBookService;
@@ -47,6 +48,17 @@ public class AdminBookController {
     @GetMapping("/{id}")
     public Result<BookVO> detail(@PathVariable Long id) {
         return Result.success(adminBookService.detail(id));
+    }
+
+    /**
+     * 图书汇总指标：GET /api/admin/book/summary
+     *
+     * <p>放在 /{id} 之后声明也不影响匹配：Spring MVC 的路径匹配是「字面量优先于模板变量」，
+     * /summary 不会被当成 id="summary" 解析。
+     */
+    @GetMapping("/summary")
+    public Result<AdminBookSummaryVO> summary() {
+        return Result.success(adminBookService.summary());
     }
 
     /** 新增图书 */

@@ -6,6 +6,7 @@ import cn.edu.bookstore.entity.User;
 import cn.edu.bookstore.mapper.OrdersMapper;
 import cn.edu.bookstore.mapper.UserMapper;
 import cn.edu.bookstore.model.dto.AdminUserQuery;
+import cn.edu.bookstore.model.vo.AdminUserSummaryVO;
 import cn.edu.bookstore.model.vo.AdminUserVO;
 import cn.edu.bookstore.model.vo.PageVO;
 import cn.edu.bookstore.model.vo.UserStatVO;
@@ -45,6 +46,19 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     private final UserMapper userMapper;
     private final OrdersMapper ordersMapper;
+
+    @Override
+    public AdminUserSummaryVO summary() {
+        AdminUserSummaryVO summary = userMapper.selectAdminSummary();
+        if (summary == null) {
+            summary = new AdminUserSummaryVO();
+            summary.setTotal(0L);
+            summary.setActive(0L);
+            summary.setDisabled(0L);
+            summary.setNewThisMonth(0L);
+        }
+        return summary;
+    }
 
     @Override
     public PageVO<AdminUserVO> page(AdminUserQuery query) {

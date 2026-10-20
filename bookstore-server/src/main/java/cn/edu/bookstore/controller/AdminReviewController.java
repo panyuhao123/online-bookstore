@@ -3,6 +3,7 @@ package cn.edu.bookstore.controller;
 import cn.edu.bookstore.common.Result;
 import cn.edu.bookstore.common.log.OpLog;
 import cn.edu.bookstore.model.dto.AdminReviewQuery;
+import cn.edu.bookstore.model.vo.AdminReviewSummaryVO;
 import cn.edu.bookstore.model.vo.AdminReviewVO;
 import cn.edu.bookstore.model.vo.PageVO;
 import cn.edu.bookstore.service.AdminReviewService;
@@ -37,6 +38,12 @@ public class AdminReviewController {
     @GetMapping("/page")
     public Result<PageVO<AdminReviewVO>> page(@ModelAttribute AdminReviewQuery query) {
         return Result.success(adminReviewService.page(query));
+    }
+
+    /** 评价汇总指标：GET /api/admin/review/summary */
+    @GetMapping("/summary")
+    public Result<AdminReviewSummaryVO> summary() {
+        return Result.success(adminReviewService.summary());
     }
 
     /**

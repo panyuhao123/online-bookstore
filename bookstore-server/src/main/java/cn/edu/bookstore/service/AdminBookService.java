@@ -2,6 +2,7 @@ package cn.edu.bookstore.service;
 
 import cn.edu.bookstore.model.dto.AdminBookQuery;
 import cn.edu.bookstore.model.dto.BookSaveRequest;
+import cn.edu.bookstore.model.vo.AdminBookSummaryVO;
 import cn.edu.bookstore.model.vo.BookVO;
 import cn.edu.bookstore.model.vo.PageVO;
 
@@ -17,6 +18,13 @@ public interface AdminBookService {
 
     /** 后台图书分页：支持关键词、分类、上下架状态筛选 */
     PageVO<BookVO> page(AdminBookQuery query);
+
+    /**
+     * 图书汇总指标（总数 / 在售 / 下架 / 库存告急 / 在库册数）。
+     *
+     * <p>不挂缓存：这是一条走索引的单表聚合，代价远低于「缓存没清导致数字错」的风险。
+     */
+    AdminBookSummaryVO summary();
 
     /** 后台图书详情（含下架图书） */
     BookVO detail(Long id);

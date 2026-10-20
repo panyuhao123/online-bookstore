@@ -1,6 +1,7 @@
 package cn.edu.bookstore.service;
 
 import cn.edu.bookstore.model.dto.AdminReviewQuery;
+import cn.edu.bookstore.model.vo.AdminReviewSummaryVO;
 import cn.edu.bookstore.model.vo.AdminReviewVO;
 import cn.edu.bookstore.model.vo.PageVO;
 
@@ -15,6 +16,13 @@ public interface AdminReviewService {
      * 评价分页：支持按图书 / 星级 / 状态筛选与关键词搜索。
      */
     PageVO<AdminReviewVO> page(AdminReviewQuery query);
+
+    /**
+     * 评价汇总指标（总数 / 正常 / 隐藏 / 平均分）。
+     *
+     * <p>平均分只统计正常评价，隐藏操作会立刻反映到这里。
+     */
+    AdminReviewSummaryVO summary();
 
     /**
      * 显示 / 隐藏评价。

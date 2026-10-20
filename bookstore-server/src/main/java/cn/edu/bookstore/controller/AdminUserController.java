@@ -3,6 +3,7 @@ package cn.edu.bookstore.controller;
 import cn.edu.bookstore.common.Result;
 import cn.edu.bookstore.common.log.OpLog;
 import cn.edu.bookstore.model.dto.AdminUserQuery;
+import cn.edu.bookstore.model.vo.AdminUserSummaryVO;
 import cn.edu.bookstore.model.vo.AdminUserVO;
 import cn.edu.bookstore.model.vo.PageVO;
 import cn.edu.bookstore.service.AdminUserService;
@@ -43,5 +44,11 @@ public class AdminUserController {
     public Result<Void> updateStatus(@PathVariable Long id, @RequestParam Integer status) {
         adminUserService.updateStatus(id, status);
         return Result.success();
+    }
+
+    /** 用户汇总指标：GET /api/admin/user/summary */
+    @GetMapping("/summary")
+    public Result<AdminUserSummaryVO> summary() {
+        return Result.success(adminUserService.summary());
     }
 }

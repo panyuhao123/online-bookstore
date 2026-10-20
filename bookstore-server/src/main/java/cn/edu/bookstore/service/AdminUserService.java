@@ -1,6 +1,7 @@
 package cn.edu.bookstore.service;
 
 import cn.edu.bookstore.model.dto.AdminUserQuery;
+import cn.edu.bookstore.model.vo.AdminUserSummaryVO;
 import cn.edu.bookstore.model.vo.AdminUserVO;
 import cn.edu.bookstore.model.vo.PageVO;
 
@@ -16,6 +17,9 @@ public interface AdminUserService {
 
     /** 用户分页：支持手机号 / 昵称模糊搜索与状态筛选 */
     PageVO<AdminUserVO> page(AdminUserQuery query);
+
+    /** 用户汇总指标（总数 / 正常 / 禁用 / 本月新增） */
+    AdminUserSummaryVO summary();
 
     /** 启用 / 禁用用户：status=1 启用，status=0 禁用 */
     void updateStatus(Long id, Integer status);

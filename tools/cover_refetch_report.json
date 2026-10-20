@@ -1,0 +1,274 @@
+[
+  {
+    "id": 10025,
+    "title": "猜猜我有多爱你",
+    "file": "bka5daea1d07.jpg",
+    "status": "KEPT",
+    "before": "比例异常 600×703（0.85，非书封形态）",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10032,
+    "title": "声律启蒙",
+    "file": "bk8d142a466d.jpg",
+    "status": "KEPT",
+    "before": "方图 1080×1088（裁成竖版会切掉标题）",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10054,
+    "title": "高效能人士的七个习惯",
+    "file": "bk0052ce1e2c.jpg",
+    "status": "KEPT",
+    "before": "排版式占位图",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10057,
+    "title": "Python编程：从入门到实践",
+    "file": "bk62d42d7bac.jpg",
+    "status": "REPLACED",
+    "before": "方图 200×200（裁成竖版会切掉标题）",
+    "note": "douban 命中《Python编程 : 从入门到实践》591×742 | 书名精确一致+作者匹配+出版社匹配(105) | 87KB"
+  },
+  {
+    "id": 10058,
+    "title": "Head First 设计模式",
+    "file": "bk04a0508574.jpg",
+    "status": "KEPT",
+    "before": "排版式占位图",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10060,
+    "title": "Redis设计与实现",
+    "file": "bk36454cdd87.jpg",
+    "status": "REPLACED",
+    "before": "排版式占位图",
+    "note": "douban 命中《Redis设计与实现》724×1008 | 书名精确一致+作者匹配+出版社匹配(105) | 82KB"
+  },
+  {
+    "id": 10064,
+    "title": "剑指Offer",
+    "file": "bkc5b93ee63f.jpg",
+    "status": "REPLACED",
+    "before": "排版式占位图",
+    "note": "douban 命中《剑指Offer : 名企面试官精讲典型编程题（第2版）》594×800 | 书名精确一致+作者匹配+出版社匹配(105) | 80KB"
+  },
+  {
+    "id": 10066,
+    "title": "机器学习",
+    "file": "bk61bb1751fd.jpg",
+    "status": "REPLACED",
+    "before": "排版式占位图",
+    "note": "douban 命中《机器学习及其应用2007》401×500 | 书名包含+作者匹配+出版社匹配(75) | 29KB"
+  },
+  {
+    "id": 10067,
+    "title": "人工智能：现代方法",
+    "file": "bk7d1a16002c.jpg",
+    "status": "KEPT",
+    "before": "排版式占位图",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10069,
+    "title": "深入理解计算机系统",
+    "file": "csapp.jpg",
+    "status": "KEPT",
+    "before": "分辨率过低 244×350",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10070,
+    "title": "计算机网络",
+    "file": "bkf75627e742.jpg",
+    "status": "KEPT",
+    "before": "排版式占位图",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10071,
+    "title": "现代操作系统",
+    "file": "bkabf06a3971.jpg",
+    "status": "REPLACED",
+    "before": "方图 200×200（裁成竖版会切掉标题）",
+    "note": "douban 命中《现代操作系统》306×435 | 书名精确一致+出版社匹配(75) | 30KB"
+  },
+  {
+    "id": 10073,
+    "title": "重构",
+    "file": "bkf1787db419.jpg",
+    "status": "REPLACED",
+    "before": "方图 200×200（裁成竖版会切掉标题）",
+    "note": "douban 命中《重构 : 改善既有代码的设计》1080×1357 | 书名精确一致+作者部分匹配+出版社匹配(87) | 151KB"
+  },
+  {
+    "id": 10074,
+    "title": "五年高考三年模拟",
+    "file": "bk3796d7eb4a.jpg",
+    "status": "REPLACED",
+    "before": "方图 303×334（裁成竖版会切掉标题）",
+    "note": "douban 命中《五年高考三年模拟》358×500 | 书名精确一致(60) | 43KB"
+  },
+  {
+    "id": 10075,
+    "title": "考研英语黄皮书",
+    "file": "bk1c50188e71.jpg",
+    "status": "KEPT",
+    "before": "排版式占位图",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10077,
+    "title": "标准日本语",
+    "file": "bk8a32e226ad.jpg",
+    "status": "KEPT",
+    "before": "排版式占位图",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10078,
+    "title": "大学英语四级真题",
+    "file": "bka226ae20d5.jpg",
+    "status": "KEPT",
+    "before": "方图 500×500（裁成竖版会切掉标题）",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10079,
+    "title": "高等数学",
+    "file": "bk122ca83f4d.jpg",
+    "status": "KEPT",
+    "before": "排版式占位图",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10080,
+    "title": "线性代数",
+    "file": "bk4d08a6448d.jpg",
+    "status": "KEPT",
+    "before": "排版式占位图",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10081,
+    "title": "中国绘画史",
+    "file": "bk6281c714dd.jpg",
+    "status": "KEPT",
+    "before": "排版式占位图",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10082,
+    "title": "芥子园画谱",
+    "file": "bkf9cb78579e.jpg",
+    "status": "KEPT",
+    "before": "方图 500×500（裁成竖版会切掉标题）",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10083,
+    "title": "美国纽约摄影学院摄影教材",
+    "file": "bk1e5b756d18.jpg",
+    "status": "KEPT",
+    "before": "方图 200×200（裁成竖版会切掉标题）",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10084,
+    "title": "音乐的故事",
+    "file": "bk48e6e9ba20.jpg",
+    "status": "KEPT",
+    "before": "排版式占位图",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10085,
+    "title": "设计中的设计",
+    "file": "bk7fa15b418b.jpg",
+    "status": "KEPT",
+    "before": "排版式占位图",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10087,
+    "title": "建筑空间组合论",
+    "file": "bkde0e16b48b.jpg",
+    "status": "KEPT",
+    "before": "排版式占位图",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10088,
+    "title": "心理学与生活",
+    "file": "psychology.jpg",
+    "status": "KEPT",
+    "before": "方图 200×200（裁成竖版会切掉标题）",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10092,
+    "title": "亲密关系",
+    "file": "bk8fc0961486.jpg",
+    "status": "KEPT",
+    "before": "排版式占位图",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10093,
+    "title": "自控力",
+    "file": "bk905b5159c0.jpg",
+    "status": "KEPT",
+    "before": "排版式占位图",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10094,
+    "title": "黄帝内经",
+    "file": "bk8306e9faf2.jpg",
+    "status": "KEPT",
+    "before": "排版式占位图",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10095,
+    "title": "人体简史",
+    "file": "bk88c7703cb6.jpg",
+    "status": "KEPT",
+    "before": "方图 800×800（裁成竖版会切掉标题）",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10096,
+    "title": "下厨房：家常菜",
+    "file": "bk4436f88714.jpg",
+    "status": "KEPT",
+    "before": "排版式占位图",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10099,
+    "title": "孤独星球：中国",
+    "file": "bk436112fb2f.jpg",
+    "status": "KEPT",
+    "before": "排版式占位图",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10100,
+    "title": "时间简史",
+    "file": "time.jpg",
+    "status": "KEPT",
+    "before": "分辨率过低 120×165",
+    "note": "未找到合格的竖版封面"
+  },
+  {
+    "id": 10101,
+    "title": "万物简史",
+    "file": "short.jpg",
+    "status": "KEPT",
+    "before": "方图 200×200（裁成竖版会切掉标题）",
+    "note": "未找到合格的竖版封面"
+  }
+]

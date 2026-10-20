@@ -15,7 +15,9 @@
  *   6. 书单页：详情抽屉渲染条目（含已下架图书）
  *   7. 到货提醒页：缺货图书的等待记录出现在看板 → 点「标记已通知」→ 该行从看板消失
  *   8. 系统设置：读回真实运费规则 → 改门槛保存 → PUT 命中正确键且页面回显新值 → 还原
- *   9. 全程无未捕获的 JS 异常
+ *   9. 四个列表页（图书/分类/用户/评价）的「汇总条 + 筛选卡 + 胶囊」三段式骨架
+ *      + 胶囊切换不改口径 + 顶栏全局搜索把关键词带到目标页请求
+ *  10. 全程无未捕获的 JS 异常
  *
  * 用法：先启动后端（8080）与管理端 dev server（5173），再执行
  *   node tools/verify_admin_ui.cjs
@@ -519,7 +521,117 @@ async function main() {
     check('运费门槛已还原为 ¥99.00', restored.includes('满 ¥99.00 包邮'),
       (restored.match(/满 ¥[\d.]+ 包邮[^\n]*/) || ['(未找到)'])[0])
 
-    // ---------- 8. 无未捕获异常 ----------
+    // ---------- 8. 列表页统一骨架（汇总条 / 筛选卡 / 胶囊） ----------
+    /**
+     * 图书 / 分类 / 用户 / 评价 四个列表页共用 styles/index.css 里的
+     * .statbar / .filter / .chips 三段式骨架。
+     *
+     * 断言锚在**类名**而不是像素：以后谁把这四个页面改回「只有一张表格」，
+     * 或者漏掉某格数值，这里直接挂 —— 视觉回归靠截图肉眼比对是靠不住的。
+     * 注意只断言「有几格、有没有数」，不断言具体数字：库里数据会变，
+     * 断言 102 会变成每天都要改的脏测试。
+     */
+    const SKELETON = `(() => {
+      const pick = (el, sel) => ((el.querySelector(sel) || {}).innerText || '').trim();
+      const cells = [...document.querySelectorAll('.statbar .statbar__cell')]
+        .map((c) => ({ label: pick(c, '.statbar__label'), value: pick(c, '.statbar__value') }));
+      return {
+        cells,
+        chips: [...document.querySelectorAll('.chips .chip')].length,
+        active: [...document.querySelectorAll('.chips .chip.on')].length,
+        filterRows: document.querySelectorAll('.filter .filter__row').length,
+        hasTable: !!document.querySelector('.list-table')
+      };
+    })()`
+
+    const LIST_PAGES = [
+      ['#/book', '图书', 5],
+      ['#/category', '分类', 4],
+      ['#/user', '用户', 4],
+      ['#/review', '评价', 4]
+    ]
+    for (const [hash, name, minCells] of LIST_PAGES) {
+      client.clearRequests()
+      await client.goto(hash, 4000)
+      const sk = (await client.eval(SKELETON)) || { cells: [], chips: 0, active: 0, filterRows: 0 }
+      const cells = sk.cells || []
+      check(`${name}页：汇总条 ${minCells} 格且每格都有标签与数值`,
+        cells.length >= minCells && cells.every((c) => c.label && c.value),
+        cells.map((c) => c.label + '=' + c.value).join(' / ') || '(未渲染 .statbar)')
+      check(`${name}页：筛选胶囊 ≥3 个且恰有一个选中（不能全亮或全灭）`,
+        sk.chips >= 3 && sk.active === 1, 'chips=' + sk.chips + ' active=' + sk.active)
+      check(`${name}页：筛选卡至少一行条件`, sk.filterRows >= 1, 'rows=' + sk.filterRows)
+      check(`${name}页：表格复用全局 .list-table 骨架`, sk.hasTable === true, String(sk.hasTable))
+    }
+
+    // 汇总条的数字不是硬编码的：切到「已下架」胶囊后，上架数不会变、表格会变空
+    await client.goto('#/book', 4000)
+    const beforeChip = await client.eval(`(() => {
+      const cell = [...document.querySelectorAll('.statbar__cell')]
+        .find((c) => ((c.querySelector('.statbar__label') || {}).innerText || '').includes('上架中'));
+      return {
+        onSale: cell ? parseInt(((cell.querySelector('.statbar__value') || {}).innerText || '0'), 10) : -1,
+        rows: document.querySelectorAll('.el-table__body-wrapper tbody tr').length
+      };
+    })()`)
+    await client.eval(CLICK_BY_TEXT('.chips .chip', '已下架'))
+    await sleep(2000)
+    const afterChip = await client.eval(`(() => {
+      const cell = [...document.querySelectorAll('.statbar__cell')]
+        .find((c) => ((c.querySelector('.statbar__label') || {}).innerText || '').includes('上架中'));
+      return {
+        onSale: cell ? parseInt(((cell.querySelector('.statbar__value') || {}).innerText || '0'), 10) : -1,
+        rows: document.querySelectorAll('.el-table__body-wrapper tbody tr').length,
+        active: ([...document.querySelectorAll('.chips .chip.on')]
+          .map((c) => (c.innerText || '').replace(/\\s+/g, ' ').trim())[0] || '')
+      };
+    })()`)
+    check('图书页：点「已下架」胶囊后选中态转移',
+      String((afterChip || {}).active || '').includes('已下架'), String((afterChip || {}).active))
+    check('图书页：汇总条数字不受胶囊过滤影响（筛选是看表格，不是改口径）',
+      (beforeChip || {}).onSale === (afterChip || {}).onSale && beforeChip.onSale >= 0,
+      '过滤前 ' + (beforeChip && beforeChip.onSale) + ' → 过滤后 ' + (afterChip && afterChip.onSale))
+    await client.eval(CLICK_BY_TEXT('.chips .chip', '全部'))
+    await sleep(1500)
+    const restoredRows = await client.eval(ROW_COUNT)
+    check('图书页：点回「全部」后表格行数不少于过滤前',
+      Number(restoredRows) >= Number((beforeChip || {}).rows || 0),
+      '过滤前 ' + (beforeChip && beforeChip.rows) + ' → 还原后 ' + restoredRows)
+
+    // ---------- 9. 顶栏全局搜索 ----------
+    /**
+     * 全局搜索是「换筛选条件」不是「进新页面」：用 replace 改 query，
+     * 目标页读 route.query.keyword 直接过滤。断言只看「有没有真的把关键词
+     * 带到目标页的请求上」，不校验返回条数（数据会变）。
+     */
+    await client.goto('#/dashboard', 3000)
+    client.clearRequests()
+    // 注意：.global-search 里有两个 input —— prepend 的 el-select 自己也是一个。
+    // 必须取 .el-input__wrapper 下面那个才是正文输入框，否则页面毫无反应还以为功能坏了。
+    const typed = await client.eval(`(() => {
+      const input = document.querySelector('.global-search .el-input__wrapper input');
+      if (!input) return 'no-input';
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+      setter.call(input, ${JSON.stringify(PHONE)});
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      input.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', bubbles: true }));
+      return 'ok';
+    })()`)
+    await sleep(3000)
+    const hashAfterSearch = String((await client.eval('location.hash')) || '')
+    const searchCall = client.calls('/api/admin/order/page').pop()
+    check('顶栏全局搜索：输入手机号回车后跳到订单页并带上 keyword',
+      hashAfterSearch.includes('/order') && hashAfterSearch.includes(PHONE),
+      typed + ' / hash=' + hashAfterSearch)
+    check('全局搜索：订单列表请求带上 keyword（手机号能一路传到底层查询）',
+      !!searchCall && decodeURIComponent(searchCall.path).includes('keyword=' + PHONE),
+      searchCall ? decodeURIComponent(searchCall.path) : '未发出 /api/admin/order/page 请求')
+
+    // 清空搜索词回到 dashboard，避免影响后面的收尾断言
+    await client.goto('#/dashboard', 2000)
+
+    // ---------- 10. 无未捕获异常 ----------
     check('全程无未捕获的 JS 异常', client.exceptions.length === 0,
       client.exceptions.slice(0, 3).join(' | '))
   } finally {

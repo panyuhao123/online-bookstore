@@ -198,6 +198,7 @@ PY_CHECKS = [
     ("verify_flyway_migration",   "Flyway 迁移与结构快照一致性",                     True, 0),
     ("verify_extended_features",  "新模块：书单/浏览历史/轮播图/运费/到货提醒/时间线", True, 0),
     ("verify_admin_booklist",     "管理端书单治理：隐藏优先于删除 / 归属语义 / 级联删除", True, 0),
+    ("verify_admin_lists",        "P2 运营能力：手机号检索 / 批量发货 / 导出 CSV / 列表汇总口径", True, 0),
 ]
 
 # 静态检查：不需要后端服务，但需要 node
@@ -215,7 +216,8 @@ WEB_CHECKS = [
 # 管理端 UI 端到端：需要后端服务 + 管理端 dev server(5173) + 本机 Chrome（用 --with-admin-ui 开启）
 ADMIN_UI_CHECKS = [
     ("verify_admin_ui.cjs",
-     "管理端 UI 端到端：轮播图增删 / 书单治理与详情 / 到货提醒 / 运费规则读写", 0),
+     "管理端 UI 端到端：轮播图增删 / 书单治理与详情 / 到货提醒 / 运费规则读写"
+     " / 四个列表页三段式骨架 / 顶栏全局搜索", 0),
 ]
 
 INFRA = [

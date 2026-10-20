@@ -45,3 +45,6 @@ tools/.tmp/
 # 结论数据以 docs/测试报告.md 为准，与 tools/baseline_*/ 的日志归档惯例一致。
 tools/out/regression_*.md
 tools/out/*.log
+# 页面截图同样是可重跑产物（tools/shot_admin_pages.cjs、tools/shot_app_preview.cjs），
+# 入库只会让仓库越来越胖；需要看图时本地跑一次即可。
+tools/out/*.png

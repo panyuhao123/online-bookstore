@@ -418,7 +418,7 @@ onMounted(load)
 }
 
 .upload-box:hover {
-  border-color: #409eff;
+  border-color: var(--brand);
 }
 
 .upload-preview {

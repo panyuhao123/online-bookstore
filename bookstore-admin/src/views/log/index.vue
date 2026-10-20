@@ -162,7 +162,7 @@ onMounted(() => {
 .expand-label {
   display: inline-block;
   width: 72px;
-  color: #909399;
+  color: var(--ink-3);
 }
 
 .expand-value {

@@ -216,7 +216,7 @@ onMounted(loadFreight)
 }
 
 .freight-tip {
-  color: #409eff;
+  color: var(--brand);
   font-weight: 600;
 }
 </style>

@@ -5,15 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>线上书店 App · UI 设计稿预览</title>
 <style>
+  /* 变量与 bookstore-app/uni.scss 一一对应（rpx→px 按 750 基准折半） */
   :root{
-    --brand:#C8362F; --brand-light:#E4574E; --brand-weak:#FDECEA;
-    --text-main:#1F2126; --text-regular:#4E5259; --text-sub:#8C9099;
-    --text-ph:#B9BDC4; --bg-page:#F4F5F7; --bg-card:#FFFFFF;
-    --border:#EDEEF0; --skeleton:#EBECEF;
-    --success:#2F9E44; --warning:#E8912A;
-    --r-sm:4px; --r-md:6px; --r-lg:10px; --r-pill:999px;
-    --sh-card:0 1px 6px rgba(31,33,38,.05);
-    --sh-float:0 -2px 10px rgba(31,33,38,.08);
+    --brand:#ff2832; --brand-light:#ff6b71; --brand-dark:#e6162d;
+    --brand-weak:#fff1f0; --brand-weak-deep:#ffe3e3;
+    --orange:#ff6f00; --orange-light:#ff8f00; --orange-dark:#e65f00; --orange-weak:#fff4e8;
+    --text-main:#333333; --text-regular:#666666; --text-sub:#8c9099;
+    --text-ph:#b9bdc4; --bg-page:#f5f5f5; --bg-card:#ffffff; --bg-fill:#f7f7f7;
+    --border:#e5e5e5; --border-light:#f0f0f0; --skeleton:#ededed;
+    --success:#2f9e44; --warning:#e8912a; --error:#e03131;
+    /* 圆角压到 4px 级：与 PC 商城端一致，胶囊只留给真圆形元素 */
+    --r-sm:2px; --r-md:4px; --r-lg:4px; --r-btn:4px; --r-pill:999px;
+    --sh-card:none; --sh-float:0 -2px 10px rgba(0,0,0,.06);
   }
   *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
   body{
@@ -33,7 +36,7 @@
   .nav li:hover{background:#fff}
   .nav li.on{background:var(--brand);color:#fff;font-weight:600;box-shadow:0 2px 8px rgba(200,54,47,.28)}
   .nav li span{display:block;font-size:11px;opacity:.72;font-weight:400;margin-top:2px}
-  .legend{margin-top:22px;background:#fff;border-radius:10px;padding:14px;box-shadow:var(--sh-card)}
+  .legend{margin-top:22px;background:#fff;border-radius:10px;padding:14px;border:1px solid var(--border)}
   .legend h3{font-size:12px;color:var(--text-sub);font-weight:600;margin-bottom:10px}
   .swatches{display:flex;gap:6px;margin-bottom:10px}
   .sw{width:26px;height:26px;border-radius:6px}
@@ -42,10 +45,10 @@
   /* ---------- 手机外框 ---------- */
   .device{
     width:375px;height:812px;background:#fff;border-radius:40px;flex-shrink:0;
-    border:10px solid #1F2126;box-shadow:0 20px 60px rgba(0,0,0,.22);
+    border:10px solid #2b2b2b;box-shadow:0 20px 60px rgba(0,0,0,.22);
     position:relative;overflow:hidden;display:flex;flex-direction:column;
   }
-  .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:150px;height:24px;background:#1F2126;border-radius:0 0 16px 16px;z-index:20}
+  .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:150px;height:24px;background:#2b2b2b;border-radius:0 0 16px 16px;z-index:20}
   .statusbar{height:40px;flex-shrink:0;display:flex;align-items:flex-end;justify-content:space-between;padding:0 20px 4px;font-size:11px;font-weight:600;background:var(--bg-card);position:relative;z-index:10}
   .statusbar.dark{background:transparent;color:#fff}
   .navbar{height:44px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;background:var(--bg-card);border-bottom:1px solid var(--border);position:relative}
@@ -53,8 +56,14 @@
   .tabbar{height:56px;flex-shrink:0;display:flex;background:var(--bg-card);border-top:1px solid var(--border);padding-bottom:6px}
   .tabbar .t{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10px;color:var(--text-sub)}
   .tabbar .t.on{color:var(--brand);font-weight:600}
-  .tabbar .ico{width:20px;height:20px;border:1.6px solid currentColor;border-radius:5px}
-  .tabbar .ico.circle{border-radius:50%}
+  /* Tab 图标：线性描边，与 static/tabbar/*.png 同一形态（未选灰 / 选中红） */
+  .tabbar .ico{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.7;
+    stroke-linecap:round;stroke-linejoin:round}
+  /* 角标：与 PC .cart-count 一致，数量用红 */
+  .tabbar .t{position:relative}
+  .cbadge{position:absolute;top:1px;left:calc(50% + 5px);min-width:13px;height:13px;padding:0 3px;
+    border-radius:999px;background:var(--brand);color:#fff;font-size:9px;font-weight:600;
+    display:flex;align-items:center;justify-content:center}
   .screen{flex:1;overflow-y:auto;background:var(--bg-page)}
   .screen::-webkit-scrollbar{width:0}
   .page{display:none}
@@ -65,19 +74,21 @@
   }
 
   /* ---------- 通用原子 ---------- */
-  .card{background:var(--bg-card);border-radius:var(--r-lg);box-shadow:var(--sh-card);margin:10px 12px;padding:12px}
+  .card{background:var(--bg-card);border-radius:var(--r-lg);border:1px solid var(--border);margin:10px 12px;padding:12px}
   .row{display:flex;align-items:center}
   .between{display:flex;align-items:center;justify-content:space-between}
   .ell2{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
   .ell1{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
   .price{color:var(--brand);font-weight:600}
-  .cover{border-radius:var(--r-md);flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:600;text-align:center;padding:6px;line-height:1.4}
-  .btn{height:44px;border-radius:var(--r-pill);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;background:var(--brand);color:#fff;flex:1}
+  .cover{border-radius:var(--r-md);flex-shrink:0;overflow:hidden;background:var(--bg-fill);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:600;text-align:center;line-height:1.4}
+  /* 真实封面：与 APP 的 cover-box 一致用 aspectFill（等比铺满、居中裁切），不留白边 */
+  .cover img{width:100%;height:100%;object-fit:cover;display:block}
+  .btn{height:44px;border-radius:var(--r-btn);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;background:var(--brand);color:#fff;flex:1}
   .btn.out{background:#fff;color:var(--brand);border:1px solid var(--brand)}
-  .btn.dis{background:#D8D9DC;color:#fff}
+  .btn.dis{background:#d9d9d9;color:#fff}
   .btn.sm{height:36px;font-size:13px;flex:none;padding:0 18px}
-  .chip{padding:5px 14px;border-radius:var(--r-pill);font-size:12px;background:#F0F1F3;color:var(--text-regular);flex-shrink:0}
-  .chip.on{background:var(--brand);color:#fff;font-weight:600}
+  .chip{padding:5px 14px;border-radius:var(--r-btn);font-size:12px;background:#fff;border:1px solid var(--border);color:var(--text-regular);flex-shrink:0}
+  .chip.on{background:var(--brand);color:#fff;font-weight:600;border-color:var(--brand)}
   .tag{padding:2px 8px;border-radius:var(--r-sm);font-size:10px;border:1px solid var(--brand);color:var(--brand)}
   .sec{font-size:14px;font-weight:600}
   .muted{color:var(--text-sub);font-size:11px}
@@ -89,14 +100,20 @@
   .sk-wrap{animation:breathe 1.2s infinite}
 
   /* ---------- 首页 ---------- */
-  .searchbar{background:#fff;padding:10px 12px;display:flex;gap:10px;align-items:center}
-  .searchbox{flex:1;height:34px;border-radius:17px;background:var(--bg-page);display:flex;align-items:center;padding:0 12px;gap:6px;font-size:12px;color:var(--text-ph)}
-  .searchbox .lens{width:13px;height:13px;border:1.5px solid var(--text-ph);border-radius:50%;position:relative}
-  .searchbox .lens::after{content:'';position:absolute;right:-5px;bottom:-3px;width:6px;height:1.5px;background:var(--text-ph);transform:rotate(45deg)}
-  .searchbtn{font-size:13px;color:var(--brand);font-weight:600}
+  .searchbar{background:#fff;padding:10px 12px;display:flex;gap:8px;align-items:center}
+  .logo{width:28px;height:28px;border-radius:var(--r-md);background:var(--brand);color:#fff;
+    font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  /* 橙边 + 内嵌橙色按钮：橙只出现在「去搜索」这个动作上 */
+  .searchbox{flex:1;min-width:0;height:32px;border-radius:var(--r-md);border:1.5px solid var(--orange);
+    background:#fff;display:flex;align-items:center;padding-left:10px;gap:6px;font-size:12px;
+    color:var(--text-ph);overflow:hidden}
+  .searchbox .lens{width:12px;height:12px;border:1.5px solid var(--orange);border-radius:50%;position:relative;flex-shrink:0}
+  .searchbox .lens::after{content:'';position:absolute;right:-4px;bottom:-2px;width:5px;height:1.5px;background:var(--orange);transform:rotate(45deg)}
+  .searchbtn{margin-left:auto;width:50px;height:100%;flex-shrink:0;background:var(--orange);color:#fff;
+    font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center}
   .chipsbar{background:#fff;padding:4px 12px 12px;display:flex;gap:8px;overflow:hidden}
   .resultbar{padding:10px 12px;font-size:11px;color:var(--text-sub);display:flex;justify-content:space-between;align-items:center}
-  .bookrow{background:#fff;border-radius:var(--r-lg);box-shadow:var(--sh-card);margin:0 12px 10px;padding:12px;display:flex;gap:12px}
+  .bookrow{background:#fff;border-radius:var(--r-lg);border:1px solid var(--border);margin:0 12px 10px;padding:12px;display:flex;gap:12px}
   .bookrow .c{width:80px;height:107px}
   .bookrow .info{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between}
   .bookrow .tt{font-size:16px;font-weight:600;line-height:1.35}
@@ -135,12 +152,12 @@
   .avatar{width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;color:#fff;font-size:26px;font-weight:600}
   .profile .nn{font-size:20px;font-weight:600;color:#fff}
   .profile .ph{font-size:12px;color:rgba(255,255,255,.85);margin-top:5px}
-  .quad{display:flex;background:#fff;border-radius:var(--r-lg);box-shadow:var(--sh-card);margin:10px 12px;padding:14px 0;position:relative}
+  .quad{display:flex;background:#fff;border-radius:var(--r-lg);border:1px solid var(--border);margin:10px 12px;padding:14px 0;position:relative}
   .quad .q{flex:1;text-align:center;position:relative}
   .quad .q .n{font-size:16px;font-weight:600}
   .quad .q .l{font-size:11px;color:var(--text-sub);margin-top:3px}
   .badge{position:absolute;top:-6px;right:22px;background:var(--brand);color:#fff;font-size:9px;padding:1px 5px;border-radius:8px;font-weight:600}
-  .menu{background:#fff;border-radius:var(--r-lg);box-shadow:var(--sh-card);margin:10px 12px;overflow:hidden}
+  .menu{background:#fff;border-radius:var(--r-lg);border:1px solid var(--border);margin:10px 12px;overflow:hidden}
   .menu .m{display:flex;align-items:center;justify-content:space-between;padding:14px 14px;border-bottom:1px solid var(--border);font-size:14px}
   .menu .m:last-child{border-bottom:none}
   .menu .ar{color:var(--text-ph);font-size:17px}
@@ -151,7 +168,7 @@
 <!-- ============ 左侧目录 ============ -->
 <aside class="side">
   <h1>线上书店 App</h1>
-  <div class="sub">UI Design Spec v1.0<br />750rpx 基准 · 375px 逻辑宽</div>
+  <div class="sub">UI Design Spec v2.1 · 对齐 PC 端<br />750rpx 基准 · 375px 逻辑宽</div>
   <ul class="nav" id="nav">
     <li class="on" data-p="p1">首页<span>Home · 搜索/分类/排序/列表</span></li>
     <li data-p="p2">分类<span>Category · 二级导航/网格</span></li>
@@ -164,13 +181,14 @@
   <div class="legend">
     <h3>色彩 Token</h3>
     <div class="swatches">
-      <div class="sw" style="background:#C8362F"></div>
-      <div class="sw" style="background:#FDECEA"></div>
-      <div class="sw" style="background:#1F2126"></div>
-      <div class="sw" style="background:#8C9099"></div>
-      <div class="sw" style="background:#F4F5F7"></div>
+      <div class="sw" style="background:#ff2832"></div>
+      <div class="sw" style="background:#ff6f00"></div>
+      <div class="sw" style="background:#fff1f0"></div>
+      <div class="sw" style="background:#333333"></div>
+      <div class="sw" style="background:#8c9099"></div>
+      <div class="sw" style="background:#f5f5f5"></div>
     </div>
-    <p>主色 #C8362F（5.9:1 AA）<br />主文 #1F2126（15.3:1 AAA）<br />正文 ≥26rpx · 触控 ≥44px</p>
+    <p>主红 #ff2832（价格 / 主操作）<br />导航橙 #ff6f00（搜索 / 购物车）<br />正文 ≥26rpx · 触控 ≥44px</p>
   </div>
 </aside>
 
@@ -182,8 +200,8 @@
   <section class="page on" id="p1">
     <div class="statusbar"><span>9:41</span><span style="letter-spacing:1px">●●● ⌶</span></div>
     <div class="searchbar">
-      <div class="searchbox"><i class="lens"></i>搜索书名 / 作者</div>
-      <div class="searchbtn">搜索</div>
+      <div class="logo">书</div>
+      <div class="searchbox"><i class="lens"></i>搜索书名 / 作者<span class="searchbtn">搜索</span></div>
     </div>
     <div class="chipsbar">
       <span class="chip on">全部</span><span class="chip">文学</span><span class="chip">科技</span>
@@ -192,42 +210,42 @@
     <div class="resultbar"><span>共 128 本</span><span style="color:var(--brand);font-weight:600">综合 ▾</span></div>
     <div class="screen" style="background:var(--bg-page)">
       <div class="bookrow">
-        <div class="cover c" style="background:linear-gradient(140deg,#3A4A63,#1F2A3A)">三体<br />全集</div>
+        <div class="cover c"><img src="assets/cover/santi.jpg" alt="三体" /></div>
         <div class="info">
           <div>
             <div class="tt ell2">三体（全集）：地球往事三部曲</div>
             <div class="au ell1">刘慈欣 · 重庆出版社</div>
           </div>
-          <div class="between"><span class="price" style="font-size:17px">¥59.00</span><span class="muted">已售 320</span></div>
+          <div class="between"><span class="price" style="font-size:19px;font-weight:700">¥59.00</span><span class="muted">已售 320</span></div>
         </div>
       </div>
       <div class="bookrow">
-        <div class="cover c" style="background:linear-gradient(140deg,#C8362F,#8E1F1A)">活着</div>
+        <div class="cover c"><img src="assets/cover/live.jpg" alt="活着" /></div>
         <div class="info">
           <div>
             <div class="tt ell2">活着</div>
             <div class="au ell1">余华 · 作家出版社</div>
           </div>
-          <div class="between"><span class="price" style="font-size:17px">¥28.00</span><span class="muted">已售 1580</span></div>
+          <div class="between"><span class="price" style="font-size:19px;font-weight:700">¥28.00</span><span class="muted">已售 1580</span></div>
         </div>
       </div>
       <div class="bookrow">
-        <div class="cover c" style="background:linear-gradient(140deg,#2F6B4F,#17402E)">百年<br />孤独</div>
+        <div class="cover c"><img src="assets/cover/lonely.jpg" alt="百年孤独" /></div>
         <div class="info">
           <div>
             <div class="tt ell2">百年孤独</div>
             <div class="au ell1">加西亚·马尔克斯 · 南海出版公司</div>
           </div>
-          <div class="between"><span class="price" style="font-size:17px">¥45.00</span><span class="muted">已售 862</span></div>
+          <div class="between"><span class="price" style="font-size:19px;font-weight:700">¥45.00</span><span class="muted">已售 862</span></div>
         </div>
       </div>
       <div style="padding:16px 0 20px;text-align:center" class="muted">— 没有更多了 —</div>
     </div>
     <div class="tabbar">
-      <div class="t on"><i class="ico" style="border-radius:3px"></i>首页</div>
-      <div class="t"><i class="ico circle"></i>分类</div>
-      <div class="t"><i class="ico" style="border-radius:3px"></i>购物车</div>
-      <div class="t"><i class="ico circle"></i>我的</div>
+      <div class="t on"><svg class="ico" viewBox="0 0 24 24"><path d="M3 10.6 12 3l9 7.6V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>首页</div>
+      <div class="t"><svg class="ico" viewBox="0 0 24 24"><path d="M4 4h6.5v6.5H4zM13.5 4H20v6.5h-6.5zM4 13.5h6.5V20H4zM13.5 13.5H20V20h-6.5z"/></svg>分类</div>
+      <div class="t"><svg class="ico" viewBox="0 0 24 24"><path d="M3 4h2.2l2.3 10.6h9.9L20 7H6.2"/><circle cx="9.5" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg>购物车<span class="cbadge">2</span></div>
+      <div class="t"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 21c0-3.9 3.4-6 7.5-6s7.5 2.1 7.5 6"/></svg>我的</div>
     </div>
   </section>
 
@@ -247,23 +265,23 @@
         </div>
         <div class="screen" style="background:#fff">
           <div class="grid">
-            <div class="g"><div class="cover c" style="background:linear-gradient(140deg,#3A4A63,#1F2A3A)">三体</div>
+            <div class="g"><div class="cover c"><img src="assets/cover/santi.jpg" alt="三体" /></div>
               <div class="tt ell2">三体（全集）</div><div class="price" style="font-size:14px;margin-top:3px">¥59.00</div></div>
-            <div class="g"><div class="cover c" style="background:linear-gradient(140deg,#C8362F,#8E1F1A)">活着</div>
+            <div class="g"><div class="cover c"><img src="assets/cover/live.jpg" alt="活着" /></div>
               <div class="tt ell2">活着</div><div class="price" style="font-size:14px;margin-top:3px">¥28.00</div></div>
-            <div class="g"><div class="cover c" style="background:linear-gradient(140deg,#2F6B4F,#17402E)">百年孤独</div>
+            <div class="g"><div class="cover c"><img src="assets/cover/lonely.jpg" alt="百年孤独" /></div>
               <div class="tt ell2">百年孤独</div><div class="price" style="font-size:14px;margin-top:3px">¥45.00</div></div>
-            <div class="g"><div class="cover c" style="background:linear-gradient(140deg,#8B6B3D,#4E3A1E)">人类简史</div>
+            <div class="g"><div class="cover c"><img src="assets/cover/sapiens.jpg" alt="人类简史" /></div>
               <div class="tt ell2">人类简史：从动物到上帝</div><div class="price" style="font-size:14px;margin-top:3px">¥68.00</div></div>
           </div>
         </div>
       </div>
     </div>
     <div class="tabbar">
-      <div class="t"><i class="ico" style="border-radius:3px"></i>首页</div>
-      <div class="t on"><i class="ico circle"></i>分类</div>
-      <div class="t"><i class="ico" style="border-radius:3px"></i>购物车</div>
-      <div class="t"><i class="ico circle"></i>我的</div>
+      <div class="t"><svg class="ico" viewBox="0 0 24 24"><path d="M3 10.6 12 3l9 7.6V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>首页</div>
+      <div class="t on"><svg class="ico" viewBox="0 0 24 24"><path d="M4 4h6.5v6.5H4zM13.5 4H20v6.5h-6.5zM4 13.5h6.5V20H4zM13.5 13.5H20V20h-6.5z"/></svg>分类</div>
+      <div class="t"><svg class="ico" viewBox="0 0 24 24"><path d="M3 4h2.2l2.3 10.6h9.9L20 7H6.2"/><circle cx="9.5" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg>购物车<span class="cbadge">2</span></div>
+      <div class="t"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 21c0-3.9 3.4-6 7.5-6s7.5 2.1 7.5 6"/></svg>我的</div>
     </div>
   </section>
 
@@ -277,10 +295,10 @@
     <div class="resultbar"><span>搜索「三体」· 找到 6 本</span><span style="color:var(--brand);font-weight:600">价格 ▾</span></div>
     <div class="screen">
       <div class="bookrow">
-        <div class="cover c" style="background:linear-gradient(140deg,#3A4A63,#1F2A3A)">三体</div>
+        <div class="cover c"><img src="assets/cover/santi.jpg" alt="三体" /></div>
         <div class="info">
           <div><div class="tt ell2">三体</div><div class="au ell1">刘慈欣 · 重庆出版社</div></div>
-          <div class="between"><span class="price" style="font-size:17px">¥23.00</span><span class="muted">已售 512</span></div>
+          <div class="between"><span class="price" style="font-size:19px;font-weight:700">¥23.00</span><span class="muted">已售 512</span></div>
         </div>
       </div>
       <div class="bookrow">
@@ -299,10 +317,10 @@
       </div>
     </div>
     <div class="tabbar">
-      <div class="t on"><i class="ico" style="border-radius:3px"></i>首页</div>
-      <div class="t"><i class="ico circle"></i>分类</div>
-      <div class="t"><i class="ico" style="border-radius:3px"></i>购物车</div>
-      <div class="t"><i class="ico circle"></i>我的</div>
+      <div class="t on"><svg class="ico" viewBox="0 0 24 24"><path d="M3 10.6 12 3l9 7.6V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>首页</div>
+      <div class="t"><svg class="ico" viewBox="0 0 24 24"><path d="M4 4h6.5v6.5H4zM13.5 4H20v6.5h-6.5zM4 13.5h6.5V20H4zM13.5 13.5H20V20h-6.5z"/></svg>分类</div>
+      <div class="t"><svg class="ico" viewBox="0 0 24 24"><path d="M3 4h2.2l2.3 10.6h9.9L20 7H6.2"/><circle cx="9.5" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg>购物车<span class="cbadge">2</span></div>
+      <div class="t"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 21c0-3.9 3.4-6 7.5-6s7.5 2.1 7.5 6"/></svg>我的</div>
     </div>
   </section>
 
@@ -311,7 +329,7 @@
     <div class="statusbar"><span>9:41</span><span style="letter-spacing:1px">●●● ⌶</span></div>
     <div class="navbar"><span class="back">‹</span>图书详情</div>
     <div class="screen">
-      <div class="detail-cover"><div class="cover c" style="background:linear-gradient(140deg,#3A4A63,#1F2A3A)">三体<br />全集</div></div>
+      <div class="detail-cover"><div class="cover c"><img src="assets/cover/santi.jpg" alt="三体" /></div></div>
       <div class="card" style="margin-top:0;border-radius:0">
         <div class="between">
           <span class="price" style="font-size:24px;font-weight:700">¥59.00</span>
@@ -352,7 +370,7 @@
       </div>
       <div class="bookrow" style="margin-top:10px;position:relative">
         <div class="check on">✓</div>
-        <div class="cover c" style="background:linear-gradient(140deg,#3A4A63,#1F2A3A);margin-left:10px">三体</div>
+        <div class="cover c" style="margin-left:10px"><img src="assets/cover/santi.jpg" alt="三体" /></div>
         <div class="info">
           <div><div style="font-size:14px;font-weight:500" class="ell2">三体（全集）</div></div>
           <div class="between" style="margin-top:6px">
@@ -364,7 +382,7 @@
       </div>
       <div class="bookrow" style="opacity:.6;position:relative">
         <div class="check"></div>
-        <div class="cover c" style="background:linear-gradient(140deg,#8B6B3D,#4E3A1E);margin-left:10px">人类简史</div>
+        <div class="cover c" style="margin-left:10px"><img src="assets/cover/sapiens.jpg" alt="人类简史" /></div>
         <div class="info">
           <div><div style="font-size:14px;font-weight:500" class="ell2">人类简史</div>
             <div style="font-size:11px;color:var(--brand);margin-top:4px">库存不足，请调整数量</div></div>
@@ -386,10 +404,10 @@
       <div class="btn" style="flex:none;padding:0 22px">去结算(2)</div>
     </div>
     <div class="tabbar">
-      <div class="t"><i class="ico" style="border-radius:3px"></i>首页</div>
-      <div class="t"><i class="ico circle"></i>分类</div>
-      <div class="t on"><i class="ico" style="border-radius:3px"></i>购物车</div>
-      <div class="t"><i class="ico circle"></i>我的</div>
+      <div class="t"><svg class="ico" viewBox="0 0 24 24"><path d="M3 10.6 12 3l9 7.6V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>首页</div>
+      <div class="t"><svg class="ico" viewBox="0 0 24 24"><path d="M4 4h6.5v6.5H4zM13.5 4H20v6.5h-6.5zM4 13.5h6.5V20H4zM13.5 13.5H20V20h-6.5z"/></svg>分类</div>
+      <div class="t on"><svg class="ico" viewBox="0 0 24 24"><path d="M3 4h2.2l2.3 10.6h9.9L20 7H6.2"/><circle cx="9.5" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg>购物车<span class="cbadge">2</span></div>
+      <div class="t"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 21c0-3.9 3.4-6 7.5-6s7.5 2.1 7.5 6"/></svg>我的</div>
     </div>
   </section>
 
@@ -411,7 +429,7 @@
       <div class="card" style="padding:0 12px">
         <div class="sec" style="padding:13px 0;border-bottom:1px solid var(--border)">商品清单</div>
         <div class="row" style="padding:10px 0;gap:10px;border-bottom:1px solid var(--border)">
-          <div class="cover c" style="background:linear-gradient(140deg,#3A4A63,#1F2A3A);width:52px;height:69px;font-size:9px">三体</div>
+          <div class="cover c" style="width:52px;height:69px;"><img src="assets/cover/santi.jpg" alt="三体" /></div>
           <div style="flex:1;min-width:0">
             <div style="font-size:13px" class="ell2">三体（全集）：地球往事三部曲</div>
             <div class="between" style="margin-top:4px">
@@ -422,7 +440,7 @@
         </div>
         <div class="between" style="padding:13px 0">
           <span style="font-size:13px;color:var(--text-regular)">共 2 件商品</span>
-          <span class="price" style="font-size:17px">¥118.00</span>
+          <span class="price" style="font-size:19px;font-weight:700">¥118.00</span>
         </div>
       </div>
       <div style="height:20px"></div>
@@ -465,10 +483,10 @@
       <div style="height:20px"></div>
     </div>
     <div class="tabbar">
-      <div class="t"><i class="ico" style="border-radius:3px"></i>首页</div>
-      <div class="t"><i class="ico circle"></i>分类</div>
-      <div class="t"><i class="ico" style="border-radius:3px"></i>购物车</div>
-      <div class="t on"><i class="ico circle"></i>我的</div>
+      <div class="t"><svg class="ico" viewBox="0 0 24 24"><path d="M3 10.6 12 3l9 7.6V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>首页</div>
+      <div class="t"><svg class="ico" viewBox="0 0 24 24"><path d="M4 4h6.5v6.5H4zM13.5 4H20v6.5h-6.5zM4 13.5h6.5V20H4zM13.5 13.5H20V20h-6.5z"/></svg>分类</div>
+      <div class="t"><svg class="ico" viewBox="0 0 24 24"><path d="M3 4h2.2l2.3 10.6h9.9L20 7H6.2"/><circle cx="9.5" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg>购物车<span class="cbadge">2</span></div>
+      <div class="t on"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 21c0-3.9 3.4-6 7.5-6s7.5 2.1 7.5 6"/></svg>我的</div>
     </div>
   </section>
 </div>
